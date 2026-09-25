@@ -56,6 +56,7 @@ internal static class StartupTask
               <Actions Context="Author">
                 <Exec>
                   <Command>{Esc(exe)}</Command>
+                  <Arguments>--tray</Arguments>
                   <WorkingDirectory>{Esc(dir)}</WorkingDirectory>
                 </Exec>
               </Actions>

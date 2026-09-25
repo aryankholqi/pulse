@@ -6,7 +6,7 @@ namespace Pulse;
 
 public partial class OverlayWindow : Window
 {
-    const double EdgeMargin = 16;
+    public const double EdgeMargin = 16;
 
     readonly AppSettings _settings;
     IntPtr _hwnd;
@@ -31,20 +31,8 @@ public partial class OverlayWindow : Window
 
     public void ApplySettings()
     {
-        double scale = Math.Clamp(_settings.Scale, 0.6, 2.0);
-        RootScale.ScaleX = scale;
-        RootScale.ScaleY = scale;
-
-        bool compact = _settings.Compact;
-        FullPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        CompactPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-        Card.Padding = compact ? new Thickness(14, 8, 14, 8) : new Thickness(16, 14, 16, 14);
-        Card.CornerRadius = new CornerRadius(compact ? 12 : 16);
-
-        // Fade only the glass, never the numbers.
-        if (Card.Background is { IsFrozen: false } glass)
-            glass.Opacity = Math.Clamp(_settings.BackgroundOpacity, 0.2, 1.0);
-
+        Card.ApplySettings(_settings);
+        ViewModel.ApplyStyle(_settings);
         Reposition();
     }
 
@@ -53,15 +41,23 @@ public partial class OverlayWindow : Window
         double w = ActualWidth, h = ActualHeight;
         if (w <= 0 || h <= 0) return;
 
-        double sw = SystemParameters.PrimaryScreenWidth;
-        double sh = SystemParameters.PrimaryScreenHeight;
+        (Left, Top) = Place(_settings.Corner, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight, w, h);
+    }
 
-        (Left, Top) = _settings.Corner switch
+    /// <summary>Top-left of a <paramref name="w"/>×<paramref name="h"/> card on a screen — shared with the preview.</summary>
+    public static (double Left, double Top) Place(Corner corner, double sw, double sh, double w, double h)
+    {
+        double left = EdgeMargin, center = Math.Round((sw - w) / 2), right = sw - w - EdgeMargin;
+        double top = EdgeMargin, bottom = sh - h - EdgeMargin;
+
+        return corner switch
         {
-            Corner.TopRight => (sw - w - EdgeMargin, EdgeMargin),
-            Corner.BottomLeft => (EdgeMargin, sh - h - EdgeMargin),
-            Corner.BottomRight => (sw - w - EdgeMargin, sh - h - EdgeMargin),
-            _ => (EdgeMargin, EdgeMargin),
+            Corner.TopCenter => (center, top),
+            Corner.TopRight => (right, top),
+            Corner.BottomLeft => (left, bottom),
+            Corner.BottomCenter => (center, bottom),
+            Corner.BottomRight => (right, bottom),
+            _ => (left, top),
         };
     }
 

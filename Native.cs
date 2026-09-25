@@ -26,6 +26,14 @@ internal static class Native
     public static void SetTopmost(IntPtr hwnd) =>
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 
+    /// <summary>Dark caption bar for the settings window (Windows 10 20H1+ / 11; ignored elsewhere).</summary>
+    public static void UseDarkTitleBar(IntPtr hwnd)
+    {
+        const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        int on = 1;
+        try { DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref on, sizeof(int)); } catch { }
+    }
+
     // ── low-impact process mode ──
     [StructLayout(LayoutKind.Sequential)]
     struct PROCESS_POWER_THROTTLING_STATE
@@ -121,6 +129,8 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
+
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
     [DllImport("kernel32.dll")] static extern bool SetProcessInformation(IntPtr hProcess, int infoClass, ref PROCESS_POWER_THROTTLING_STATE info, uint size);

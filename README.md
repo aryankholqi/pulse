@@ -9,13 +9,25 @@ GPU & CPU temperature and usage, RAM, VRAM, FPS, 1% low and a frame-time graph, 
 3. Click **Next**, choose whether you want a desktop shortcut and whether Pulse should start when you sign in, then **Install**.
 4. Leave **Launch Pulse now** checked and click **Finish**.
 
-Pulse lives in the system tray (the pulse icon near the clock).
+When Pulse starts it opens its **customize window** first:
+
+- **Layout**: compact (one line, the default) or full (frame-time graph and details).
+- **Position**: any corner, or top / bottom center.
+- **Colors**: pick the FPS, GPU, CPU and RAM colors (swatches, any color, or a hex code).
+- **Size** and **background** opacity, language (English / فارسی), start with Windows.
+- **Live preview**: the overlay on a game scene (The Last of Us Part I & II, Cyberpunk 2077,
+  Elden Ring, Red Dead Redemption 2, God of War Ragnarök, Counter-Strike 2) or on your own
+  screenshot, at your screen's real proportions, with the game's HUD and a zoom.
+
+Click **Launch overlay**. Pulse then lives in the system tray (the pulse icon near the clock):
+click it to show / hide the overlay, double-click it (or run Pulse again) to reopen the window.
+When Pulse starts with Windows it goes straight to the overlay.
 
 | Hotkey | Action |
 |---|---|
 | `Ctrl+Shift+O` | Show / hide |
 | `Ctrl+Shift+L` | Full ⇄ compact |
-| `Ctrl+Shift+P` | Next screen corner |
+| `Ctrl+Shift+P` | Next position |
 
 Set games to **Borderless / Windowed Fullscreen** so the overlay can appear on top.
 Uninstall from **Settings → Apps → Pulse**.
@@ -47,6 +59,7 @@ GitHub Actions builds the installer and attaches it to a Release. You can also r
 - No injection: FPS comes from ETW (PresentMon), so anti-cheat is not involved.
 - Efficiency mode + below-normal priority.
 - Sensors 1×/s, UI 2×/s, unchanged values are never redrawn; hidden overlay = no polling.
+- The customize window is closed (not hidden) once you launch, and its preview memory is freed.
 
 ## Limits
 

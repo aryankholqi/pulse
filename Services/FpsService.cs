@@ -15,13 +15,24 @@ public readonly record struct FpsStats(double? Fps, double? Low1, double? FrameT
 
 /// <summary>
 /// Runs Intel PresentMon (ETW, no injection into the game → anti-cheat safe) and keeps
-/// frame times only for the process that owns the foreground window.
+/// recent frames of every presenting process, tagged by PID. The overlay reads the one
+/// the player is in.
+///
+/// Two rules keep the counter from dropping to "–" mid-game:
+///  • Rates come from the frames' own durations, never from when lines reach us —
+///    PresentMon's output arrives in bursts (pipe buffering, ETW flushes).
+///  • Switching focus never clears anything, and a window that isn't drawing
+///    (notification, launcher, chat app) doesn't take the counter away from the game.
 /// </summary>
 public sealed class FpsService : IDisposable
 {
-    const int Capacity = 8192;          // ~16 s of frames at 500 fps
+    const int Capacity = 16384;         // all presenting processes together: ~20 s at 800 fps
     const int GraphPoints = 90;
     const string SessionName = "PulseOverlay";
+
+    const double StaleSeconds = 3;      // nothing from the target this long → paused / loading / minimised
+    const double PresentingSeconds = 2; // "is this process drawing?" look-back
+    const double MaxHistorySeconds = 15;
 
     readonly string _exePath;
     readonly string _args;
@@ -29,10 +40,12 @@ public sealed class FpsService : IDisposable
 
     readonly object _gate = new();
     readonly double[] _frameMs = new double[Capacity];
-    readonly long[] _stamp = new long[Capacity];
+    readonly long[] _stamp = new long[Capacity];   // when the line reached us (staleness only)
+    readonly int[] _pid = new int[Capacity];
     int _head, _count;
 
-    volatile int _targetPid;
+    int _foregroundPid;
+    int _targetPid;                                // what the overlay shows; guarded by _gate
     Process? _proc;
     IntPtr _job;
     volatile bool _disposed;
@@ -99,12 +112,9 @@ public sealed class FpsService : IDisposable
                 }
                 if (!haveHeader) continue;
 
-                int target = _targetPid;
-                if (target == 0) continue;
-
                 if (!TryField(line, pidCol, out var pidSpan)
                     || !int.TryParse(pidSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out int pid)
-                    || pid != target)
+                    || pid == _selfPid)
                     continue;
 
                 if (!TryField(line, frameCol, out var msSpan)
@@ -115,9 +125,9 @@ public sealed class FpsService : IDisposable
                 long now = Stopwatch.GetTimestamp();
                 lock (_gate)
                 {
-                    if (pid != _targetPid) continue; // foreground changed while we parsed
                     _frameMs[_head] = ms;
                     _stamp[_head] = now;
+                    _pid[_head] = pid;
                     _head = (_head + 1) % Capacity;
                     if (_count < Capacity) _count++;
                 }
@@ -168,80 +178,105 @@ public sealed class FpsService : IDisposable
         return true;
     }
 
-    /// <summary>Call from the UI tick: follows whatever window the player is in.</summary>
+    /// <summary>
+    /// Call from the UI tick: follows the window the player is in — but only once that
+    /// window's process is actually presenting frames. Until then the last game keeps the counter.
+    /// </summary>
     public void UpdateTarget()
     {
         IntPtr hwnd = Native.GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return;
-        Native.GetWindowThreadProcessId(hwnd, out uint raw);
-        int pid = (int)raw;
-        if (pid == _targetPid || pid == _selfPid) return;
+        if (hwnd != IntPtr.Zero)
+        {
+            Native.GetWindowThreadProcessId(hwnd, out uint raw);
+            if ((int)raw != _selfPid && raw != 0) _foregroundPid = (int)raw;
+        }
 
+        int fg = _foregroundPid, previous;
         lock (_gate)
         {
-            _head = 0;
-            _count = 0;
-            _targetPid = pid;
+            previous = _targetPid;
+            if (fg == 0 || fg == _targetPid) return;
+
+            long since = Stopwatch.GetTimestamp() - (long)(Stopwatch.Frequency * PresentingSeconds);
+            if (IsPresenting(fg, since) || !IsPresenting(_targetPid, since))
+                _targetPid = fg;
+            if (_targetPid == previous) return;
         }
 
         string name = "";
-        try { using var p = Process.GetProcessById(pid); name = p.ProcessName; } catch { }
+        try { using var p = Process.GetProcessById(fg); name = p.ProcessName; } catch { }
         TargetName = name;
+    }
+
+    // Caller holds _gate.
+    bool IsPresenting(int pid, long since)
+    {
+        if (pid == 0) return false;
+        for (int k = 0; k < _count; k++)
+        {
+            int i = (_head - 1 - k + Capacity) % Capacity;
+            if (_stamp[i] < since) return false;
+            if (_pid[i] == pid) return true;
+        }
+        return false;
     }
 
     public FpsStats GetStats()
     {
         lock (_gate)
         {
-            if (_count == 0) return FpsStats.Empty;
+            int target = _targetPid;
+            if (_count == 0 || target == 0) return FpsStats.Empty;
 
             long now = Stopwatch.GetTimestamp();
             long freq = Stopwatch.Frequency;
-            int newest = (_head - 1 + Capacity) % Capacity;
+            long oldest = now - (long)(freq * MaxHistorySeconds);
 
-            // No frames for 1.5 s → not a game (or paused/minimised).
-            if (now - _stamp[newest] > freq * 3 / 2) return FpsStats.Empty;
-
-            long oneSecAgo = now - freq;
-            long tenSecAgo = now - freq * 10;
-
-            double sum1 = 0;
-            int n1 = 0, n10 = 0;
-            double[] window = ArrayPool<double>.Shared.Rent(_count);
+            // Newest first: the target's frames only, up to 10 s of *game* time.
+            double[] frames = ArrayPool<double>.Shared.Rent(Math.Min(_count, Capacity));
             try
             {
-                for (int k = 0; k < _count; k++)
+                int n = 0;
+                double total = 0;
+                long newestStamp = 0;
+                for (int k = 0; k < _count && total < 10_000; k++)
                 {
-                    int i = (newest - k + Capacity) % Capacity;
-                    long t = _stamp[i];
-                    if (t < tenSecAgo) break;
-                    double ms = _frameMs[i];
-                    window[n10++] = ms;
-                    if (t >= oneSecAgo) { sum1 += ms; n1++; }
+                    int i = (_head - 1 - k + Capacity) % Capacity;
+                    if (_stamp[i] < oldest) break;
+                    if (_pid[i] != target) continue;
+                    if (n == 0) newestStamp = _stamp[i];
+                    frames[n++] = _frameMs[i];
+                    total += _frameMs[i];
                 }
 
-                double? fps = n1 > 0 && sum1 > 0 ? n1 * 1000.0 / sum1 : null;
-                double? frameTime = n1 > 0 ? sum1 / n1 : null;
+                // Nothing new for a while: paused, loading or minimised — not a hiccup in delivery.
+                if (n == 0 || now - newestStamp > freq * StaleSeconds) return FpsStats.Empty;
+
+                // FPS and frame time over the latest ~1 s of frames.
+                double sum1 = 0;
+                int n1 = 0;
+                while (n1 < n && sum1 < 1000) sum1 += frames[n1++];
+                double fps = n1 * 1000.0 / sum1;
+                double frameTime = sum1 / n1;
+
+                int g = Math.Min(GraphPoints, n);
+                var graph = new double[g];
+                for (int k = 0; k < g; k++) graph[k] = frames[g - 1 - k]; // oldest → newest
 
                 // "1% low" = FPS at the 99th-percentile frame time over the last 10 s.
                 double? low = null;
-                if (n10 >= 20)
+                if (n >= 20)
                 {
-                    Array.Sort(window, 0, n10);
-                    int idx = Math.Clamp((int)Math.Ceiling(n10 * 0.99) - 1, 0, n10 - 1);
-                    low = 1000.0 / window[idx];
+                    Array.Sort(frames, 0, n);
+                    int idx = Math.Clamp((int)Math.Ceiling(n * 0.99) - 1, 0, n - 1);
+                    low = 1000.0 / frames[idx];
                 }
-
-                int g = Math.Min(GraphPoints, _count);
-                var graph = new double[g];
-                for (int k = 0; k < g; k++)
-                    graph[k] = _frameMs[(newest - (g - 1 - k) + Capacity) % Capacity];
 
                 return new FpsStats(fps, low, frameTime, graph);
             }
             finally
             {
-                ArrayPool<double>.Shared.Return(window);
+                ArrayPool<double>.Shared.Return(frames);
             }
         }
     }

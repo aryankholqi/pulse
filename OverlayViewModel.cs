@@ -16,7 +16,6 @@ internal static class Palette
     public static readonly Brush Cool = Make(0x8F, 0xD8, 0xC8);   // thermal: comfortable
     public static readonly Brush Warm = Make(0xF3, 0xC1, 0x6E);   // thermal: working hard
     public static readonly Brush Hot = Make(0xFF, 0x74, 0x6C);    // thermal: throttling territory
-    public static readonly Brush Smooth = Make(0xF6, 0xF1, 0xE7); // fps ≥ 60: calm ivory, not a traffic light
     public static readonly Brush Choppy = Make(0xF3, 0xC1, 0x6E);
     public static readonly Brush Poor = Make(0xFF, 0x74, 0x6C);
 
@@ -35,10 +34,12 @@ internal static class Palette
         _ => Cool,
     };
 
-    public static Brush ForFps(double? fps) => fps switch
+    // Judge the number the user sees: a 60 fps cap reading "60" must not glow amber at 59.7.
+    public static Brush ForFps(double? fps, Brush smooth, bool warnings) => (fps is double f ? Math.Round(f) : (double?)null) switch
     {
         null => Muted,
-        >= 60 => Smooth,
+        _ when !warnings => smooth,
+        >= 60 => smooth,
         >= 30 => Choppy,
         _ => Poor,
     };
@@ -63,6 +64,18 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     public string FrameTimeText { get => _frameTimeText; private set => Set(ref _frameTimeText, value); }
     public Brush FpsBrush { get => _fpsBrush; private set => Set(ref _fpsBrush, value); }
     public double[]? FrameTimes { get => _frameTimes; private set => Set(ref _frameTimes, value); }
+
+    // fps ≥ 60 wears the user's colour (default: calm ivory, not a traffic light)
+    Brush _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(AppSettings.DefaultFpsColor, AppSettings.DefaultFpsColor));
+    bool _fpsWarnings = true;
+    double? _fps;
+
+    public void ApplyStyle(AppSettings settings)
+    {
+        _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(settings.FpsColor, AppSettings.DefaultFpsColor));
+        _fpsWarnings = settings.FpsWarnings;
+        FpsBrush = Palette.ForFps(_fps, _fpsSmooth, _fpsWarnings);
+    }
 
     // ── gpu ──
     string _gpuTempText = Dash, _gpuLoadText = Dash, _gpuName = "", _gpuVramText = "";
@@ -103,7 +116,8 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         FpsText = live ? Math.Round(fps.Fps!.Value).ToString("0", Inv) : Dash;
         FpsLowText = fps.Low1 is double low ? low.ToString("0", Inv) : Dash;
         FrameTimeText = fps.FrameTimeMs is double ft ? ft.ToString("0.0", Inv) + " ms" : "";
-        FpsBrush = Palette.ForFps(fps.Fps);
+        _fps = fps.Fps;
+        FpsBrush = Palette.ForFps(fps.Fps, _fpsSmooth, _fpsWarnings);
         FrameTimes = fps.Graph;
         TargetName = live && target.Length > 0 ? target : fpsError ?? "Waiting for a game";
 
