@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -32,6 +33,9 @@ public partial class App : Application
     Forms.ContextMenuStrip? _trayMenu;
     DispatcherTimer? _timer;
     bool _hintedTray;
+    DispatcherTimer? _updateTimer;
+    UpdateInfo? _pendingUpdate;   // found automatically, not yet shown in the dialog
+    UpdateWindow? _updateWindow;
     bool _exiting;
     int _tick;
 
@@ -99,6 +103,15 @@ public partial class App : Application
         _timer.Start();
 
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
+
+        // First update check shortly after start (not during it), then every 6 hours.
+        _updateTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(10) };
+        _updateTimer.Tick += async (_, _) =>
+        {
+            _updateTimer.Interval = TimeSpan.FromHours(6);
+            await CheckForUpdateAsync();
+        };
+        _updateTimer.Start();
 
         if (fromLogon || !_settings.ShowSettingsOnLaunch) ShowOverlay();
         else ShowSettings();
@@ -168,12 +181,69 @@ public partial class App : Application
                 _settingsWindow?.Close();
             };
             _settingsWindow.QuitRequested += Quit;
+            _settingsWindow.UpdateFound += ShowUpdate;
             _settingsWindow.Closed += OnSettingsClosed;
         }
 
         if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;
         _settingsWindow.Show();
         _settingsWindow.Activate();
+
+        // An update found while only the overlay was up: offer it now that the user is here.
+        if (_pendingUpdate is { } update)
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => ShowUpdate(update)));
+    }
+
+    // ───────────────────────── updates ─────────────────────────
+
+    async Task CheckForUpdateAsync()
+    {
+        if (_settings is not { CheckForUpdates: true } || _updateWindow != null) return;
+
+        UpdateInfo? update;
+        try { update = await UpdateService.CheckAsync(); }
+        catch { return; } // offline / GitHub down: try again next time, quietly
+
+        if (update is null || update.Version.ToString() == _settings.SkippedVersion) return;
+        if (_pendingUpdate?.Version == update.Version) return; // already offered this session
+
+        _pendingUpdate = update;
+        if (_settingsWindow?.IsVisible == true)
+        {
+            ShowUpdate(update);
+        }
+        else
+        {
+            // Probably in a game: never pop a window over it. A tray note it is.
+            _tray?.ShowBalloonTip(6000, "Pulse", string.Format(Loc.T("TrayUpdate"), update.Version), Forms.ToolTipIcon.Info);
+        }
+    }
+
+    void ShowUpdate(UpdateInfo update)
+    {
+        _pendingUpdate = null;
+        if (_updateWindow != null) { _updateWindow.Activate(); return; }
+
+        _updateWindow = new UpdateWindow(update);
+        if (_settingsWindow?.IsVisible == true) _updateWindow.Owner = _settingsWindow;
+        else _updateWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+        _updateWindow.Closed += (_, _) =>
+        {
+            var choice = _updateWindow.Choice;
+            _updateWindow = null;
+            switch (choice)
+            {
+                case UpdateChoice.Skip:
+                    if (_settings != null) { _settings.SkippedVersion = update.Version.ToString(); _settings.Save(); }
+                    break;
+                case UpdateChoice.Installing:
+                    Quit(); // the installer waits for nothing: it closes whatever is left and relaunches us
+                    break;
+            }
+        };
+        _updateWindow.Show();
+        _updateWindow.Activate();
     }
 
     // Closed, not hidden: the preview's bitmaps (tens of MB) must not live on next to a game.
@@ -270,6 +340,8 @@ public partial class App : Application
         };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleOverlay(); };
         _tray.MouseDoubleClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ShowSettings(); };
+        // the only balloon worth clicking is "update available": open the settings, which offers it
+        _tray.BalloonTipClicked += (_, _) => { if (_pendingUpdate != null) ShowSettings(); };
     }
 
     /// <summary>Every tray item keeps its string key in Tag; re-read them after a language switch.</summary>
@@ -336,6 +408,7 @@ public partial class App : Application
         _showSignal?.Dispose();
         _exiting = true;
         _timer?.Stop();
+        _updateTimer?.Stop();
         _hotkeys?.Dispose();
 
         if (_tray != null)

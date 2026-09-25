@@ -120,39 +120,64 @@
                     </StackPanel>
                 </Border>
 
-                <!-- metrics: what the overlay shows; the last two left on lock themselves -->
+                <!-- metrics: what the overlay shows, one row each; the last two left on lock themselves.
+                     Rows bleed into the panel padding (-12) so their text lines up with the section title. -->
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Right" Text="{local:T MetricsMin}" Style="{StaticResource Hint}" />
                             <TextBlock Text="{local:T Metrics}" Style="{StaticResource SectionTitle}" />
                         </DockPanel>
-                        <UniformGrid Columns="2">
-                            <CheckBox x:Name="MetricFps" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="0,0,5,12">
+
+                        <StackPanel Margin="-12,-4,-12,-6">
+                            <CheckBox x:Name="MetricFps" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
                                 <StackPanel>
-                                    <TextBlock Text="FPS" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" />
+                                    <TextBlock Text="FPS" FontWeight="SemiBold" />
+                                    <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </CheckBox>
-                            <CheckBox x:Name="MetricGpu" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="5,0,0,12">
+                            <Border Style="{StaticResource RowRule}" />
+
+                            <CheckBox x:Name="MetricGpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
                                 <StackPanel>
-                                    <TextBlock Text="GPU" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="{local:T MetricGpuHint}" Style="{StaticResource Hint}" />
+                                    <TextBlock Text="GPU" FontWeight="SemiBold" />
+                                    <TextBlock Text="{local:T MetricGpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </CheckBox>
-                            <CheckBox x:Name="MetricCpu" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="0,0,5,0">
+
+                            <!-- GPU extras: nested under GPU, shown only while it's on -->
+                            <Border x:Name="GpuExtras" Margin="24,0,0,6" Padding="6,0,0,0"
+                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
                                 <StackPanel>
-                                    <TextBlock Text="CPU" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="{local:T MetricCpuHint}" Style="{StaticResource Hint}" />
+                                    <CheckBox x:Name="GpuHotspot" Style="{StaticResource SubRowSwitch}">
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{local:T GpuHotspot}" /><Run Text="   " /><Run Text="{local:T GpuHotspotHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
+                                        </TextBlock>
+                                    </CheckBox>
+                                    <CheckBox x:Name="CompactVram" Style="{StaticResource SubRowSwitch}" ToolTip="{local:T CompactVramHint}">
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{local:T CompactVram}" />
+                                        </TextBlock>
+                                    </CheckBox>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource RowRule}" />
+
+                            <CheckBox x:Name="MetricCpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                <StackPanel>
+                                    <TextBlock Text="CPU" FontWeight="SemiBold" />
+                                    <TextBlock Text="{local:T MetricCpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </CheckBox>
-                            <CheckBox x:Name="MetricRam" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="5,0,0,0">
+                            <Border Style="{StaticResource RowRule}" />
+
+                            <CheckBox x:Name="MetricRam" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
                                 <StackPanel>
-                                    <TextBlock Text="RAM" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="{local:T MetricRamHint}" Style="{StaticResource Hint}" />
+                                    <TextBlock Text="RAM" FontWeight="SemiBold" />
+                                    <TextBlock Text="{local:T MetricRamHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </CheckBox>
-                        </UniformGrid>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -207,6 +232,14 @@
                         <TextBlock Text="{local:T General}" Style="{StaticResource SectionTitle}" />
                         <CheckBox x:Name="StartWithWindows" Style="{StaticResource Switch}" Content="{local:T StartWithWindows}" IsEnabled="False" />
                         <CheckBox x:Name="ShowOnLaunch" Style="{StaticResource Switch}" Content="{local:T ShowOnLaunch}" Margin="0,10,0,0" />
+                        <CheckBox x:Name="AutoUpdate" Style="{StaticResource Switch}" Content="{local:T AutoUpdate}" Margin="0,10,0,0" />
+
+                        <!-- version + manual check -->
+                        <Border Height="1" Background="{StaticResource Line}" Margin="0,14,0,12" />
+                        <DockPanel>
+                            <Button x:Name="CheckUpdates" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T CheckNow}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="UpdateStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
                     </StackPanel>
                 </Border>
 

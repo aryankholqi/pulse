@@ -30,11 +30,23 @@ public sealed class AppSettings
     public bool ShowCpu { get; set; } = true;
     public bool ShowRam { get; set; } = true;
 
+    /// <summary>GPU hot spot (junction) temp next to the core temp. Opt-in; hidden anyway on GPUs that don't report it.</summary>
+    public bool ShowGpuHotspot { get; set; }
+
+    /// <summary>VRAM used in the compact line (the full layout always shows it). Opt-in.</summary>
+    public bool ShowCompactVram { get; set; }
+
     [JsonIgnore]
     public int MetricCount => (ShowFps ? 1 : 0) + (ShowGpu ? 1 : 0) + (ShowCpu ? 1 : 0) + (ShowRam ? 1 : 0);
 
     /// <summary>Open the customise window on launch (logon starts skip it: see <c>--tray</c>).</summary>
     public bool ShowSettingsOnLaunch { get; set; } = true;
+
+    // ── updates (GitHub Releases) ──
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>A version the user chose "Skip this version" for: never offered again automatically.</summary>
+    public string? SkippedVersion { get; set; }
 
     // ── colours (#RRGGBB) ──
     public string FpsColor { get; set; } = DefaultFpsColor;

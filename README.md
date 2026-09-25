@@ -31,7 +31,7 @@ Pulse shows your frame rate, frame times and hardware vitals in a small, clean c
 | **FPS** | Live frame rate of the game you're playing, averaged over the last second |
 | **1% low** | The frame rate of your slowest 1% of frames over the last 10 seconds, the best single number for stutter |
 | **Frame time** | Average milliseconds per frame, plus a live frame-time graph |
-| **GPU** | Temperature, usage, model name and VRAM used / total |
+| **GPU** | Temperature, optional hot spot (where the card reports it), usage, model name and VRAM used / total (VRAM optional in compact mode) |
 | **CPU** | Temperature, usage and model name |
 | **RAM** | Memory used, percentage and total installed |
 
@@ -90,7 +90,7 @@ Pulse shows your frame rate, frame times and hardware vitals in a small, clean c
 
 > Pulse runs as administrator. It needs admin rights to read hardware sensors and to capture frame timings from Windows. The installer sets this up, so you won't see a UAC prompt every time Pulse starts at sign-in.
 
-To upgrade, run the newer installer over the old one. Your settings are kept.
+Pulse checks GitHub for new releases and offers to update itself: one click downloads the new installer, verifies it, installs it and reopens Pulse. You can turn this off under **General**, or upgrade by hand by running the newer installer over the old one. Your settings are kept either way.
 
 ---
 

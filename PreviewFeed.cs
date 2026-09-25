@@ -42,7 +42,10 @@ internal sealed class PreviewFeed
         float ram = real?.RamTotalGb is > 0 and float t ? t : 32;
         var hw = new HardwareSnapshot(
             GpuName: real?.GpuName ?? "NVIDIA GeForce RTX 4070",
-            GpuTemp: Wave(66, 2, 0.4), GpuLoad: Math.Min(100, Wave(scene.GpuLoad, 2, 1.3)),
+            GpuTemp: Wave(66, 2, 0.4),
+            // match the real card: no hot spot in the preview if this GPU can't report one
+            GpuHotspot: real is null || real.GpuHotspot is not null ? Wave(81, 3, 0.4) : null,
+            GpuLoad: Math.Min(100, Wave(scene.GpuLoad, 2, 1.3)),
             VramUsedMb: vram * 0.64f, VramTotalMb: vram,
             CpuName: real?.CpuName ?? "AMD Ryzen 7 7800X3D",
             CpuTemp: Wave(71, 3, 0.5), CpuLoad: Wave(scene.CpuLoad, 6, 0.9),

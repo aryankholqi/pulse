@@ -56,4 +56,8 @@ if (-not $iscc) { throw "Inno Setup 6 not found. Install it with:  winget instal
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
 $out = Resolve-Path "dist\Pulse-Setup-$Version.exe"
+
+# Pulse's updater verifies the download against this before running it.
+$hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content "$out.sha256" "$hash  Pulse-Setup-$Version.exe" -Encoding ascii -NoNewline
 Write-Host "`nDone!  $out" -ForegroundColor Green

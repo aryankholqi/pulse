@@ -61,6 +61,8 @@ Filename: "{app}\{#AppExe}"; Parameters: "--register-startup"; Tasks: startup; F
 Filename: "{app}\{#AppExe}"; Parameters: "--unregister-startup"; Tasks: not startup; Flags: runhidden waituntilterminated
 ; "Launch Pulse" checkbox on the last page. Setup is already elevated, so no second UAC prompt.
 Filename: "{app}\{#AppExe}"; Description: "Launch Pulse now"; Flags: nowait postinstall skipifsilent runascurrentuser
+; In-app update: Pulse runs this setup with /SILENT /RELAUNCH and exits; bring the new version back up.
+Filename: "{app}\{#AppExe}"; Flags: nowait runascurrentuser; Check: WizardSilent and ShouldRelaunch
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/f /im {#AppExe}"; Flags: runhidden; RunOnceId: "StopPulse"
@@ -68,6 +70,16 @@ Filename: "{app}\{#AppExe}"; Parameters: "--unregister-startup"; Flags: runhidde
 Filename: "{sys}\logman.exe"; Parameters: "stop PulseOverlay -ets"; Flags: runhidden; RunOnceId: "StopEtwSession"
 
 [Code]
+// /RELAUNCH: passed by Pulse's own updater (Inno ignores switches it doesn't know).
+function ShouldRelaunch: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/RELAUNCH') = 0 then Result := True;
+end;
+
 // Close a running Pulse before files are replaced (upgrades / reinstalls).
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var

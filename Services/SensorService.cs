@@ -6,7 +6,7 @@ using LibreHardwareMonitor.Hardware;
 namespace Pulse.Services;
 
 public sealed record HardwareSnapshot(
-    string? GpuName, float? GpuTemp, float? GpuLoad, float? VramUsedMb, float? VramTotalMb,
+    string? GpuName, float? GpuTemp, float? GpuHotspot, float? GpuLoad, float? VramUsedMb, float? VramTotalMb,
     string? CpuName, float? CpuTemp, float? CpuLoad,
     float? RamUsedGb, float? RamTotalGb, float? RamLoad);
 
@@ -109,10 +109,13 @@ public sealed class SensorService : IDisposable
             cpuLoad = Find(_cpu, SensorType.Load, "CPU Total");
         }
 
-        float? gpuTemp = null, gpuLoad = null, vramUsed = null, vramTotal = null;
+        float? gpuTemp = null, gpuHotspot = null, gpuLoad = null, vramUsed = null, vramTotal = null;
         if (_gpu != null)
         {
             gpuTemp = Find(_gpu, SensorType.Temperature, "GPU Core");
+            // AMD junction temp; NVIDIA only on newer cards/drivers. Null (hidden) when not reported.
+            gpuHotspot = Find(_gpu, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "GPU Junction");
+            if (gpuHotspot is <= 0) gpuHotspot = null;
             gpuLoad = Find(_gpu, SensorType.Load, "GPU Core", "D3D 3D");
             vramUsed = Find(_gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
             vramTotal = Find(_gpu, SensorType.SmallData, "GPU Memory Total");
@@ -127,7 +130,7 @@ public sealed class SensorService : IDisposable
         }
 
         return new HardwareSnapshot(
-            _gpu?.Name, gpuTemp, gpuLoad, vramUsed, vramTotal,
+            _gpu?.Name, gpuTemp, gpuHotspot, gpuLoad, vramUsed, vramTotal,
             _cpu?.Name, cpuTemp, cpuLoad,
             ramUsed, ramUsed + ramAvail, ramLoad);
     }

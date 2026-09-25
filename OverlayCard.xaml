@@ -124,6 +124,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <TextBlock Text="GPU" Style="{StaticResource Device}" Foreground="{DynamicResource GpuHue}" />
@@ -132,7 +133,13 @@
                                      Value="{Binding GpuLoad}" Fill="{DynamicResource GpuFill}" Track="{StaticResource TrackBrush}" />
                         <TextBlock Grid.Column="3" Text="{Binding GpuLoadText}" Style="{StaticResource FigureRight}" />
 
-                        <DockPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,2,0,0">
+                        <!-- hot spot (junction): only on GPUs that report it -->
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding GpuHotspotText}" Foreground="{Binding GpuHotspotBrush}"
+                                   Visibility="{Binding GpuHotspotVisibility}" Style="{StaticResource Figure}" FontSize="12" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Text="hot spot" Margin="2,0,0,0"
+                                   Visibility="{Binding GpuHotspotVisibility}" Style="{StaticResource Note}" />
+
+                        <DockPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,2,0,0">
                             <TextBlock DockPanel.Dock="Right" Text="{Binding GpuVramText}" Style="{StaticResource Note}" Margin="8,0,0,0" />
                             <TextBlock Text="{Binding GpuName}" Style="{StaticResource Note}" />
                         </DockPanel>
@@ -197,7 +204,15 @@
                         <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
                         <TextBlock Text="GPU" Style="{StaticResource Device}" Foreground="{DynamicResource GpuHue}" Margin="0,0,7,0" />
                         <TextBlock Text="{Binding GpuTempText}" Foreground="{Binding GpuTempBrush}" Style="{StaticResource Figure}" />
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding GpuHotspotVisibility}">
+                            <TextBlock Text="/" Style="{StaticResource Figure}" FontSize="12" Foreground="{StaticResource Faint}" Margin="2,0" />
+                            <TextBlock Text="{Binding GpuHotspotText}" Foreground="{Binding GpuHotspotBrush}" Style="{StaticResource Figure}" FontSize="13" />
+                        </StackPanel>
                         <TextBlock Text="{Binding GpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding CompactVramVisibility}" Margin="7,0,0,0">
+                            <TextBlock Text="{Binding GpuVramShortText}" Style="{StaticResource FigureRight}" />
+                            <TextBlock Text="vram" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="3,0,0,3" />
+                        </StackPanel>
                     </StackPanel>
 
                     <StackPanel x:Name="CompactCpu" Orientation="Horizontal">

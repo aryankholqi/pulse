@@ -46,6 +46,8 @@ public partial class SettingsWindow : Window
     public event Action? LanguageChanged;
     public event Action? LaunchRequested;
     public event Action? QuitRequested;
+    /// <summary>"Check now" found a newer release: the app shows the update dialog.</summary>
+    public event Action<UpdateInfo>? UpdateFound;
 
     public SettingsWindow(AppSettings settings, Func<HardwareSnapshot?> realHardware, Func<bool> overlayRunning)
     {
@@ -237,6 +239,8 @@ public partial class SettingsWindow : Window
         (_settings.Compact ? LayoutCompact : LayoutFull).IsChecked = true;
 
         foreach (var (box, get, _) in Metrics) box.IsChecked = get();
+        GpuHotspot.IsChecked = _settings.ShowGpuHotspot;
+        CompactVram.IsChecked = _settings.ShowCompactVram;
         RefreshMetricLocks();
 
         foreach (RadioButton slot in PositionGrid.Children)
@@ -251,6 +255,8 @@ public partial class SettingsWindow : Window
         RefreshSliderLabels();
 
         ShowOnLaunch.IsChecked = _settings.ShowSettingsOnLaunch;
+        AutoUpdate.IsChecked = _settings.CheckForUpdates;
+        SetUpdateStatus("VersionLabel", UpdateService.Current);
         HudToggle.IsChecked = _settings.PreviewHud;
 
         string sceneId = _settings.PreviewScene == CustomScene && File.Exists(_settings.PreviewImage) ? CustomScene : _scene.Id;
@@ -267,6 +273,8 @@ public partial class SettingsWindow : Window
 
         foreach (var (box, _, set) in Metrics)
             OnSwitch(box, on => { set(on); RefreshMetricLocks(); Commit(); });
+        OnSwitch(GpuHotspot, on => { _settings.ShowGpuHotspot = on; Commit(); });
+        OnSwitch(CompactVram, on => { _settings.ShowCompactVram = on; Commit(); });
 
         OnSwitch(FpsWarnings, on => { _settings.FpsWarnings = on; Commit(); });
         ResetColors.Click += (_, _) =>
@@ -281,6 +289,8 @@ public partial class SettingsWindow : Window
         OpacitySlider.ValueChanged += (_, e) => { _settings.BackgroundOpacity = Math.Round(e.NewValue, 2); RefreshSliderLabels(); Commit(); };
 
         OnSwitch(ShowOnLaunch, on => { _settings.ShowSettingsOnLaunch = on; Save(); });
+        OnSwitch(AutoUpdate, on => { _settings.CheckForUpdates = on; Save(); });
+        CheckUpdates.Click += async (_, _) => await CheckForUpdate();
         StartWithWindows.Click += async (_, _) =>
         {
             bool on = StartWithWindows.IsChecked == true;
@@ -334,6 +344,39 @@ public partial class SettingsWindow : Window
             if (locked) box.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("[MetricsLocked]") { Source = Loc.Instance });
             else box.ClearValue(ToolTipProperty);
         }
+        GpuExtras.Visibility = _settings.ShowGpu ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    async Task CheckForUpdate()
+    {
+        CheckUpdates.IsEnabled = false;
+        SetUpdateStatus("Checking");
+        try
+        {
+            var update = await UpdateService.CheckAsync();
+            if (update is null) SetUpdateStatus("UpToDate", UpdateService.Current);
+            else
+            {
+                SetUpdateStatus("UpdateFound", update.Version);
+                UpdateFound?.Invoke(update); // asked for by hand: offer it even if it was skipped
+            }
+        }
+        catch { SetUpdateStatus("CheckFailed"); }
+        finally { CheckUpdates.IsEnabled = true; }
+    }
+
+    // Bound to Loc so the line re-translates on a language switch.
+    void SetUpdateStatus(string key, object? arg = null) =>
+        UpdateStatus.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding($"[{key}]")
+        {
+            Source = Loc.Instance,
+            Converter = arg is null ? null : new FormatConverter(arg),
+        });
+
+    sealed class FormatConverter(object arg) : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type t, object p, CultureInfo c) => string.Format(CultureInfo.InvariantCulture, (string)value, arg);
+        public object ConvertBack(object value, Type t, object p, CultureInfo c) => throw new NotSupportedException();
     }
 
     void SetLanguage(AppLanguage language)

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Media;
 using Pulse.Services;
 
@@ -31,6 +32,15 @@ internal static class Palette
         null => Muted,
         >= 85 => Hot,
         >= 72 => Warm,
+        _ => Cool,
+    };
+
+    // Hot spot normally runs 10–20° above the core; AMD throttles near 110°.
+    public static Brush ForHotspot(float? t) => t switch
+    {
+        null => Muted,
+        >= 100 => Hot,
+        >= 90 => Warm,
         _ => Cool,
     };
 
@@ -75,6 +85,10 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(settings.FpsColor, AppSettings.DefaultFpsColor));
         _fpsWarnings = settings.FpsWarnings;
         FpsBrush = Palette.ForFps(_fps, _fpsSmooth, _fpsWarnings);
+        _showHotspot = settings.ShowGpuHotspot;
+        RefreshHotspotVisibility();
+        _showCompactVram = settings.ShowCompactVram;
+        RefreshCompactVramVisibility();
     }
 
     // ── gpu ──
@@ -88,6 +102,25 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     public string GpuVramText { get => _gpuVramText; private set => Set(ref _gpuVramText, value); }
     public double GpuLoad { get => _gpuLoad; private set => Set(ref _gpuLoad, value); }
     public Brush GpuTempBrush { get => _gpuTempBrush; private set => Set(ref _gpuTempBrush, value); }
+
+    // hot spot: collapsed entirely on GPUs that don't report it
+    string _gpuHotspotText = "";
+    Brush _gpuHotspotBrush = Palette.Muted;
+    Visibility _gpuHotspotVisibility = Visibility.Collapsed;
+    bool _showHotspot;
+    float? _gpuHotspot;
+
+    public string GpuHotspotText { get => _gpuHotspotText; private set => Set(ref _gpuHotspotText, value); }
+    public Brush GpuHotspotBrush { get => _gpuHotspotBrush; private set => Set(ref _gpuHotspotBrush, value); }
+    public Visibility GpuHotspotVisibility { get => _gpuHotspotVisibility; private set => Set(ref _gpuHotspotVisibility, value); }
+
+    // compact VRAM: opt-in, collapsed when the driver doesn't report usage
+    string _gpuVramShortText = "";
+    Visibility _compactVramVisibility = Visibility.Collapsed;
+    bool _showCompactVram;
+
+    public string GpuVramShortText { get => _gpuVramShortText; private set => Set(ref _gpuVramShortText, value); }
+    public Visibility CompactVramVisibility { get => _compactVramVisibility; private set => Set(ref _compactVramVisibility, value); }
 
     // ── cpu ──
     string _cpuTempText = Dash, _cpuLoadText = Dash, _cpuName = "";
@@ -126,12 +159,18 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         // gpu
         GpuTempText = Temp(hw.GpuTemp);
         GpuTempBrush = Palette.ForTemp(hw.GpuTemp);
+        GpuHotspotText = Temp(hw.GpuHotspot);
+        GpuHotspotBrush = Palette.ForHotspot(hw.GpuHotspot);
+        _gpuHotspot = hw.GpuHotspot;
+        RefreshHotspotVisibility();
         GpuLoad = hw.GpuLoad ?? 0;
         GpuLoadText = Pct(hw.GpuLoad);
         GpuName = ShortGpu(hw.GpuName);
         GpuVramText = hw.VramUsedMb is float used && hw.VramTotalMb is float total && total > 0
             ? $"{(used / 1024).ToString("0.0", Inv)} / {(total / 1024).ToString("0", Inv)} GB VRAM"
             : "";
+        GpuVramShortText = hw.VramUsedMb is float u0 ? (u0 / 1024).ToString("0.0", Inv) + "G" : "";
+        RefreshCompactVramVisibility();
 
         // cpu
         CpuTempText = Temp(hw.CpuTemp);
@@ -146,6 +185,12 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         RamUsedText = hw.RamUsedGb is float u ? u.ToString("0.0", Inv) + "G" : Dash;
         RamTotalText = hw.RamTotalGb is float t ? $"of {t.ToString("0", Inv)} GB" : "";
     }
+
+    void RefreshHotspotVisibility() =>
+        GpuHotspotVisibility = _showHotspot && _gpuHotspot is not null ? Visibility.Visible : Visibility.Collapsed;
+
+    void RefreshCompactVramVisibility() =>
+        CompactVramVisibility = _showCompactVram && _gpuVramShortText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     static string Temp(float? t) => t is float v ? v.ToString("0", Inv) + "°" : Dash;
     static string Pct(float? p) => p is float v ? v.ToString("0", Inv) + "%" : Dash;
