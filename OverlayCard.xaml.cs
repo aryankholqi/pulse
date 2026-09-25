@@ -29,12 +29,44 @@ public partial class OverlayCard : UserControl
         Card.Padding = compact ? new Thickness(14, 8, 14, 8) : new Thickness(16, 14, 16, 14);
         Card.CornerRadius = new CornerRadius(compact ? 12 : 16);
 
+        ApplyMetrics(settings);
+
         // Fade only the glass, never the numbers.
         if (Card.Background is { IsFrozen: false } glass)
             glass.Opacity = Math.Clamp(settings.BackgroundOpacity, 0.2, 1.0);
 
         ApplyTheme(settings);
     }
+
+    /// <summary>Show only the metrics the user picked, with dividers and gaps only between visible ones.</summary>
+    void ApplyMetrics(AppSettings s)
+    {
+        Show(FullFps, s.ShowFps);
+        Show(CompactFps, s.ShowFps);
+
+        // (full row, compact group, visible) in display order
+        var devices = new (FrameworkElement Full, Panel Compact, bool On)[]
+        {
+            (FullGpu, CompactGpu, s.ShowGpu),
+            (FullCpu, CompactCpu, s.ShowCpu),
+            (FullRam, CompactRam, s.ShowRam),
+        };
+
+        bool compactLead = !s.ShowFps, fullLead = true;
+        foreach (var (full, compact, on) in devices)
+        {
+            Show(full, on);
+            Show(compact, on);
+            if (!on) continue;
+
+            full.Margin = new Thickness(0, fullLead ? 0 : 10, 0, 0);
+            compact.Children[0].Visibility = compactLead ? Visibility.Collapsed : Visibility.Visible; // its divider
+            fullLead = compactLead = false;
+        }
+    }
+
+    static void Show(UIElement element, bool on) =>
+        element.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
 
     void ApplyTheme(AppSettings s)
     {

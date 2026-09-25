@@ -23,6 +23,16 @@ public sealed class AppSettings
 
     public AppLanguage Language { get; set; } = AppLanguage.English;
 
+    // ── what the overlay shows (at least MinMetrics stay on) ──
+    public const int MinMetrics = 2;
+    public bool ShowFps { get; set; } = true;
+    public bool ShowGpu { get; set; } = true;
+    public bool ShowCpu { get; set; } = true;
+    public bool ShowRam { get; set; } = true;
+
+    [JsonIgnore]
+    public int MetricCount => (ShowFps ? 1 : 0) + (ShowGpu ? 1 : 0) + (ShowCpu ? 1 : 0) + (ShowRam ? 1 : 0);
+
     /// <summary>Open the customise window on launch (logon starts skip it: see <c>--tray</c>).</summary>
     public bool ShowSettingsOnLaunch { get; set; } = true;
 
@@ -65,8 +75,12 @@ public sealed class AppSettings
     {
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), Json) ?? new AppSettings();
+            if (File.Exists(FilePath) && JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), Json) is { } s)
+            {
+                // A hand-edited file with too few metrics: bring them all back.
+                if (s.MetricCount < MinMetrics) s.ShowFps = s.ShowGpu = s.ShowCpu = s.ShowRam = true;
+                return s;
+            }
         }
         catch { /* corrupt file → defaults */ }
         return new AppSettings();

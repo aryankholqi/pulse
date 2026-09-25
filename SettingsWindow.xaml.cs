@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
@@ -66,6 +67,7 @@ public partial class SettingsWindow : Window
         BuildPositions();
         BuildColorRows();
         BuildSceneChips();
+        BuildSupporters();
         LoadValues();
         Wire();
 
@@ -149,10 +151,93 @@ public partial class SettingsWindow : Window
         SceneChips.Children.Add(own);
     }
 
+    /// <summary>One clickable card per channel: avatar, name, @handle → opens their post.</summary>
+    void BuildSupporters()
+    {
+        SupportersPanel.Visibility = Supporters.All.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        foreach (var s in Supporters.All)
+        {
+            var avatar = new Border
+            {
+                Width = 38,
+                Height = 38,
+                CornerRadius = new CornerRadius(19),
+                Background = ColorUtil.Frozen(new LinearGradientBrush(
+                    Color.FromRgb(0x3C, 0xB4, 0xEE), Color.FromRgb(0x1D, 0x8C, 0xC8), 90)), // Telegram blue
+                Child = new TextBlock
+                {
+                    Text = s.Initials,
+                    Foreground = Brushes.White,
+                    FontFamily = new FontFamily("Bahnschrift, Segoe UI"),
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 13,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+
+            var text = new StackPanel { Margin = new Thickness(12, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock
+            {
+                Text = s.Name,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = (Brush)FindResource("Text"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+            text.Children.Add(new TextBlock
+            {
+                Text = $"@{s.Handle}  ·  Telegram",
+                FontSize = 11.5,
+                Foreground = (Brush)FindResource("Muted"),
+                Margin = new Thickness(0, 1, 0, 0),
+                FlowDirection = FlowDirection.LeftToRight,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            });
+
+            var arrow = new TextBlock
+            {
+                Text = ((char)0xE8A7).ToString(), // OpenInNewWindow
+                FlowDirection = FlowDirection.LeftToRight, // the glyph must not mirror in Persian
+                FontFamily = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+                FontSize = 12,
+                Foreground = (Brush)FindResource("Muted"),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            var row = new DockPanel();
+            DockPanel.SetDock(avatar, Dock.Left);
+            DockPanel.SetDock(arrow, Dock.Right);
+            row.Children.Add(avatar);
+            row.Children.Add(arrow);
+            row.Children.Add(text);
+
+            var card = new Button
+            {
+                Style = (Style)FindResource("Card"),
+                Content = row,
+                ToolTip = s.PostUrl,
+                Margin = new Thickness(0, SupporterList.Children.Count == 0 ? 0 : 8, 0, 0),
+            };
+            System.Windows.Automation.AutomationProperties.SetName(card, s.Name);
+            card.Click += (_, _) => OpenUrl(s.PostUrl);
+            SupporterList.Children.Add(card);
+        }
+    }
+
+    static void OpenUrl(string url)
+    {
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { /* no browser / blocked: nothing useful to do */ }
+    }
+
     void LoadValues()
     {
         (_settings.Language == AppLanguage.Persian ? LangFa : LangEn).IsChecked = true;
         (_settings.Compact ? LayoutCompact : LayoutFull).IsChecked = true;
+
+        foreach (var (box, get, _) in Metrics) box.IsChecked = get();
+        RefreshMetricLocks();
 
         foreach (RadioButton slot in PositionGrid.Children)
             slot.IsChecked = (Corner)slot.Tag == _settings.Corner;
@@ -179,6 +264,9 @@ public partial class SettingsWindow : Window
 
         LayoutCompact.Checked += (_, _) => { _settings.Compact = true; Commit(); };
         LayoutFull.Checked += (_, _) => { _settings.Compact = false; Commit(); };
+
+        foreach (var (box, _, set) in Metrics)
+            OnSwitch(box, on => { set(on); RefreshMetricLocks(); Commit(); });
 
         OnSwitch(FpsWarnings, on => { _settings.FpsWarnings = on; Commit(); });
         ResetColors.Click += (_, _) =>
@@ -226,6 +314,27 @@ public partial class SettingsWindow : Window
     }
 
     // ───────────────────────── behaviour ─────────────────────────
+
+    (CheckBox Box, Func<bool> Get, Action<bool> Set)[] Metrics =>
+    [
+        (MetricFps, () => _settings.ShowFps, v => _settings.ShowFps = v),
+        (MetricGpu, () => _settings.ShowGpu, v => _settings.ShowGpu = v),
+        (MetricCpu, () => _settings.ShowCpu, v => _settings.ShowCpu = v),
+        (MetricRam, () => _settings.ShowRam, v => _settings.ShowRam = v),
+    ];
+
+    /// <summary>Down to the minimum: the switches still on can't be turned off.</summary>
+    void RefreshMetricLocks()
+    {
+        bool atMin = _settings.MetricCount <= AppSettings.MinMetrics;
+        foreach (var (box, get, _) in Metrics)
+        {
+            bool locked = atMin && get();
+            box.IsEnabled = !locked;
+            if (locked) box.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("[MetricsLocked]") { Source = Loc.Instance });
+            else box.ClearValue(ToolTipProperty);
+        }
+    }
 
     void SetLanguage(AppLanguage language)
     {
