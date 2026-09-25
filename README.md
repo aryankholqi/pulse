@@ -17,6 +17,7 @@ Pulse shows your frame rate, frame times and hardware vitals in a small, clean c
 - [Why Pulse doesn't slow your games down](#why-pulse-doesnt-slow-your-games-down)
 - [Known limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
+- [Thanks](#thanks)
 - [For developers](#for-developers)
 
 ---
@@ -119,6 +120,9 @@ To open the customize window at any time, **double-click the tray icon**, choose
 |---|---|
 | **Compact** | Playing: one unobtrusive line |
 | **Full** | Benchmarking and tuning: graph, 1% low, meters and device details |
+
+### Show on overlay
+Switch **FPS**, **GPU**, **CPU** and **RAM** on or off to choose what the overlay shows, in both layouts. At least two must stay on, so the last two switches lock until you turn another one back on.
 
 ### Position on screen
 Top left · Top center · Top right · Bottom left · Bottom center · Bottom right.
@@ -223,6 +227,16 @@ Go to **Settings → Apps → Installed apps → Pulse → Uninstall**. The unin
 | Opening Pulse again does nothing | Pulse is already running in the tray. Running it again opens the customize window. |
 
 Settings are stored in `%APPDATA%\Pulse\settings.json`. If something goes wrong, details are written to `%APPDATA%\Pulse\error.log`.
+
+---
+
+## Thanks
+
+These channels shared Pulse with their communities. Thank you!
+
+- [**PC Gaming Hub**](https://t.me/pcgaminghub/28369) on Telegram
+
+You'll find them in the app too, at the bottom of the customize window.
 
 ---
 

@@ -120,6 +120,42 @@
                     </StackPanel>
                 </Border>
 
+                <!-- metrics: what the overlay shows; the last two left on lock themselves -->
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{local:T MetricsMin}" Style="{StaticResource Hint}" />
+                            <TextBlock Text="{local:T Metrics}" Style="{StaticResource SectionTitle}" />
+                        </DockPanel>
+                        <UniformGrid Columns="2">
+                            <CheckBox x:Name="MetricFps" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="0,0,5,12">
+                                <StackPanel>
+                                    <TextBlock Text="FPS" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="MetricGpu" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="5,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="GPU" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{local:T MetricGpuHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="MetricCpu" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="0,0,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="CPU" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{local:T MetricCpuHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="MetricRam" Style="{StaticResource Switch}" ToolTipService.ShowOnDisabled="True" Margin="5,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="RAM" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{local:T MetricRamHint}" Style="{StaticResource Hint}" />
+                                </StackPanel>
+                            </CheckBox>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
                 <!-- position: a miniature screen, click where the overlay should sit -->
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
@@ -166,11 +202,20 @@
                 </Border>
 
                 <!-- general -->
-                <Border Style="{StaticResource Panel}" Margin="0">
+                <Border Style="{StaticResource Panel}">
                     <StackPanel>
                         <TextBlock Text="{local:T General}" Style="{StaticResource SectionTitle}" />
                         <CheckBox x:Name="StartWithWindows" Style="{StaticResource Switch}" Content="{local:T StartWithWindows}" IsEnabled="False" />
                         <CheckBox x:Name="ShowOnLaunch" Style="{StaticResource Switch}" Content="{local:T ShowOnLaunch}" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- thanks: channels that shared Pulse (list in Supporters.cs) -->
+                <Border x:Name="SupportersPanel" Style="{StaticResource Panel}" Margin="0">
+                    <StackPanel>
+                        <TextBlock Text="{local:T Supporters}" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" />
+                        <TextBlock Text="{local:T SupportersHint}" Style="{StaticResource Hint}" Margin="0,0,0,12" TextWrapping="Wrap" />
+                        <StackPanel x:Name="SupporterList" />
                     </StackPanel>
                 </Border>
             </StackPanel>

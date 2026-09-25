@@ -71,48 +71,50 @@
                 <!-- ═════════ Full layout ═════════ -->
                 <StackPanel x:Name="FullPanel" Width="238">
 
-                    <!-- whose frames we're counting -->
-                    <DockPanel LastChildFill="True">
-                        <Ellipse DockPanel.Dock="Left" Width="6" Height="6" Fill="{Binding FpsBrush}"
-                                 VerticalAlignment="Center" Margin="0,1,8,0" />
-                        <TextBlock Text="{Binding TargetName}" Style="{StaticResource Note}" Foreground="{StaticResource Soft}" />
-                    </DockPanel>
+                    <StackPanel x:Name="FullFps">
+                        <!-- whose frames we're counting -->
+                        <DockPanel LastChildFill="True">
+                            <Ellipse DockPanel.Dock="Left" Width="6" Height="6" Fill="{Binding FpsBrush}"
+                                     VerticalAlignment="Center" Margin="0,1,8,0" />
+                            <TextBlock Text="{Binding TargetName}" Style="{StaticResource Note}" Foreground="{StaticResource Soft}" />
+                        </DockPanel>
 
-                    <!-- hero: FPS -->
-                    <Grid Margin="0,4,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                        <!-- hero: FPS -->
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}"
-                                   FontFamily="{StaticResource Digits}" FontSize="44"
-                                   Typography.NumeralAlignment="Tabular" Margin="-2,-4,0,-6" />
-                        <TextBlock Grid.Column="1" Text="fps" FontSize="12" Foreground="{StaticResource Soft}"
-                                   VerticalAlignment="Bottom" Margin="6,0,0,6" />
+                            <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}"
+                                       FontFamily="{StaticResource Digits}" FontSize="44"
+                                       Typography.NumeralAlignment="Tabular" Margin="-2,-4,0,-6" />
+                            <TextBlock Grid.Column="1" Text="fps" FontSize="12" Foreground="{StaticResource Soft}"
+                                       VerticalAlignment="Bottom" Margin="6,0,0,6" />
 
-                        <StackPanel Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,4">
-                            <TextBlock Text="{Binding FpsLowText}" Style="{StaticResource FigureRight}" FontSize="17" />
-                            <TextBlock Text="1% low" Style="{StaticResource Note}" HorizontalAlignment="Right" />
-                        </StackPanel>
-                    </Grid>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,4">
+                                <TextBlock Text="{Binding FpsLowText}" Style="{StaticResource FigureRight}" FontSize="17" />
+                                <TextBlock Text="1% low" Style="{StaticResource Note}" HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Grid>
 
-                    <!-- frame-time trace -->
-                    <ui:Sparkline Height="30" Margin="0,8,0,0"
-                                  Values="{Binding FrameTimes}"
-                                  Stroke="{DynamicResource TraceStroke}"
-                                  Area="{DynamicResource TraceArea}"
-                                  Baseline="{StaticResource RuleBrush}" />
-                    <DockPanel Margin="0,4,0,0">
-                        <TextBlock DockPanel.Dock="Right" Text="{Binding FrameTimeText}" Style="{StaticResource Note}" />
-                        <TextBlock Text="Frame time" Style="{StaticResource Note}" />
-                    </DockPanel>
+                        <!-- frame-time trace -->
+                        <ui:Sparkline Height="30" Margin="0,8,0,0"
+                                      Values="{Binding FrameTimes}"
+                                      Stroke="{DynamicResource TraceStroke}"
+                                      Area="{DynamicResource TraceArea}"
+                                      Baseline="{StaticResource RuleBrush}" />
+                        <DockPanel Margin="0,4,0,0">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding FrameTimeText}" Style="{StaticResource Note}" />
+                            <TextBlock Text="Frame time" Style="{StaticResource Note}" />
+                        </DockPanel>
 
-                    <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,12,0,12" />
+                        <Border Height="1" Background="{StaticResource RuleBrush}" Margin="0,12,0,12" />
+                    </StackPanel>
 
-                    <!-- GPU -->
-                    <Grid>
+                    <!-- GPU (top margins of the device rows are set in code: only between visible rows) -->
+                    <Grid x:Name="FullGpu">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="34" />
                             <ColumnDefinition Width="44" />
@@ -137,7 +139,7 @@
                     </Grid>
 
                     <!-- CPU -->
-                    <Grid Margin="0,10,0,0">
+                    <Grid x:Name="FullCpu" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="34" />
                             <ColumnDefinition Width="44" />
@@ -160,7 +162,7 @@
                     </Grid>
 
                     <!-- RAM -->
-                    <Grid Margin="0,10,0,0">
+                    <Grid x:Name="FullRam" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="34" />
                             <ColumnDefinition Width="44" />
@@ -184,26 +186,32 @@
                 </StackPanel>
 
                 <!-- ═════════ Compact layout: one line for competitive play ═════════ -->
+                <!-- each group but the first opens with its own divider; code hides the one that ends up leading -->
                 <StackPanel x:Name="CompactPanel" Orientation="Horizontal" Visibility="Collapsed">
-                    <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}" Style="{StaticResource Figure}" FontSize="18" />
-                    <TextBlock Text="fps" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
+                    <StackPanel x:Name="CompactFps" Orientation="Horizontal">
+                        <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}" Style="{StaticResource Figure}" FontSize="18" />
+                        <TextBlock Text="fps" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
+                    </StackPanel>
 
-                    <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                    <StackPanel x:Name="CompactGpu" Orientation="Horizontal">
+                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <TextBlock Text="GPU" Style="{StaticResource Device}" Foreground="{DynamicResource GpuHue}" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding GpuTempText}" Foreground="{Binding GpuTempBrush}" Style="{StaticResource Figure}" />
+                        <TextBlock Text="{Binding GpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
+                    </StackPanel>
 
-                    <TextBlock Text="GPU" Style="{StaticResource Device}" Foreground="{DynamicResource GpuHue}" Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding GpuTempText}" Foreground="{Binding GpuTempBrush}" Style="{StaticResource Figure}" />
-                    <TextBlock Text="{Binding GpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
+                    <StackPanel x:Name="CompactCpu" Orientation="Horizontal">
+                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <TextBlock Text="CPU" Style="{StaticResource Device}" Foreground="{DynamicResource CpuHue}" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding CpuTempText}" Foreground="{Binding CpuTempBrush}" Style="{StaticResource Figure}" />
+                        <TextBlock Text="{Binding CpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
+                    </StackPanel>
 
-                    <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
-
-                    <TextBlock Text="CPU" Style="{StaticResource Device}" Foreground="{DynamicResource CpuHue}" Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding CpuTempText}" Foreground="{Binding CpuTempBrush}" Style="{StaticResource Figure}" />
-                    <TextBlock Text="{Binding CpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
-
-                    <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
-
-                    <TextBlock Text="RAM" Style="{StaticResource Device}" Foreground="{DynamicResource RamHue}" Margin="0,0,7,0" />
-                    <TextBlock Text="{Binding RamLoadText}" Style="{StaticResource FigureRight}" />
+                    <StackPanel x:Name="CompactRam" Orientation="Horizontal">
+                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <TextBlock Text="RAM" Style="{StaticResource Device}" Foreground="{DynamicResource RamHue}" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding RamLoadText}" Style="{StaticResource FigureRight}" />
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
