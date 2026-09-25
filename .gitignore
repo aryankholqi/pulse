@@ -1,0 +1,6 @@
+bin/
+obj/
+publish/
+dist/
+Tools/PresentMon.exe
+Tools/PresentMon-LICENSE.txt

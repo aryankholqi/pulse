@@ -1,0 +1,8 @@
+Pulse bundles the following third-party software.
+
+PresentMon (Intel Corporation) — MIT License
+  https://github.com/GameTechDev/PresentMon
+  Full license text: Tools\PresentMon-LICENSE.txt
+
+LibreHardwareMonitorLib — Mozilla Public License 2.0 (used unmodified)
+  Source code: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
