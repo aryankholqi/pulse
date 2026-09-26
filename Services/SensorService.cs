@@ -24,6 +24,12 @@ public sealed class SensorService : IDisposable
     HardwareSnapshot? _latest;
     volatile bool _paused;
 
+    // RTX 50 (Blackwell) dropped the hot spot from NVAPI. LHM 0.9.4 still fills "GPU Hot Spot" from the old
+    // NVAPI slot, which on these cards is the core sensor itself at 1/256° resolution: a finer core reading,
+    // not a hot spot. (LHM builds that read the real one through the PawnIO driver also expose
+    // "GPU Hot Spot #1…"; that value is genuine and left alone.)
+    bool _gpuHotspotEchoesCore;
+
     public HardwareSnapshot? Latest => Volatile.Read(ref _latest);
     public string? Error { get; private set; }
     public bool Paused { get => _paused; set => _paused = value; }
@@ -92,6 +98,10 @@ public sealed class SensorService : IDisposable
                     break;
             }
         }
+
+        _gpuHotspotEchoesCore = _gpu is { HardwareType: HardwareType.GpuNvidia } nv
+            && (nv.Name.StartsWith("NVIDIA GeForce RTX 50", StringComparison.OrdinalIgnoreCase)
+                || nv.Name.Contains("Blackwell", StringComparison.OrdinalIgnoreCase));
     }
 
     HardwareSnapshot Poll()
@@ -112,10 +122,16 @@ public sealed class SensorService : IDisposable
         float? gpuTemp = null, gpuHotspot = null, gpuLoad = null, vramUsed = null, vramTotal = null;
         if (_gpu != null)
         {
-            gpuTemp = Find(_gpu, SensorType.Temperature, "GPU Core");
-            // AMD junction temp; NVIDIA only on newer cards/drivers. Null (hidden) when not reported.
-            gpuHotspot = Find(_gpu, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "GPU Junction");
-            if (gpuHotspot is <= 0) gpuHotspot = null;
+            gpuTemp = Plausible(Find(_gpu, SensorType.Temperature, "GPU Core"));
+            // AMD junction temp; NVIDIA through NVAPI up to RTX 40. Null (hidden) when not reported.
+            gpuHotspot = Plausible(Find(_gpu, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "GPU Junction"));
+            if (_gpuHotspotEchoesCore && gpuHotspot is float echo
+                && Find(_gpu, SensorType.Temperature, "GPU Hot Spot #1") is null)
+            {
+                // Agreeing with the whole-degree core is the echo's signature; otherwise keep the stock reading.
+                if (gpuTemp is not float core || Math.Abs(echo - core) < 1.5f) gpuTemp = echo;
+                gpuHotspot = null;
+            }
             gpuLoad = Find(_gpu, SensorType.Load, "GPU Core", "D3D 3D");
             vramUsed = Find(_gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
             vramTotal = Find(_gpu, SensorType.SmallData, "GPU Memory Total");
@@ -145,6 +161,9 @@ public sealed class SensorService : IDisposable
                     return v;
         return null;
     }
+
+    // 0 and 255 are what a missing sensor reads as, never a real GPU temperature.
+    static float? Plausible(float? t) => t is > 0 and < 150 ? t : null;
 
     static float? FirstPositive(IHardware hw, SensorType type)
     {

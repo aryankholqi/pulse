@@ -119,6 +119,13 @@ public sealed class Loc : INotifyPropertyChanged
         ["UpdateInstalling"] = ("Starting the installer…", "در حال اجرای نصب‌کننده…"),
         ["UpdateFailed"] = ("The update couldn't be downloaded.", "دانلود به‌روزرسانی انجام نشد."),
         ["UpdateRetry"] = ("Try again", "تلاش دوباره"),
+
+        // ── what's new (after an update) ──
+        ["WhatsNewTitle"] = ("What's new in Pulse", "تغییرات Pulse"),
+        ["WhatsNewHeadline"] = ("Pulse has been updated", "Pulse به‌روز شد"),
+        ["WhatsNewOk"] = ("Got it", "متوجه شدم"),
+        ["TrayUpdated"] = ("Pulse was updated to {0}. Click to see what's new.",
+                           "Pulse به نسخه‌ی {0} به‌روز شد. برای دیدن تغییرات کلیک کن."),
         ["HotkeysTaken"] = ("These hotkeys are taken by another app: ", "این کلیدها را برنامه‌ی دیگری گرفته: "),
     };
 }

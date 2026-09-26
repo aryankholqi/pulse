@@ -48,6 +48,13 @@ public sealed class AppSettings
     /// <summary>A version the user chose "Skip this version" for: never offered again automatically.</summary>
     public string? SkippedVersion { get; set; }
 
+    /// <summary>The newest version whose "what's new" the user has seen; a newer Pulse shows its changes once.</summary>
+    public string? LastSeenVersion { get; set; }
+
+    /// <summary>No settings file yet: a fresh install, so there's nothing "new" to announce.</summary>
+    [JsonIgnore]
+    public bool FirstRun { get; private set; }
+
     // ── colours (#RRGGBB) ──
     public string FpsColor { get; set; } = DefaultFpsColor;
     public string GpuColor { get; set; } = DefaultGpuColor;
@@ -95,7 +102,7 @@ public sealed class AppSettings
             }
         }
         catch { /* corrupt file → defaults */ }
-        return new AppSettings();
+        return new AppSettings { FirstRun = true };
     }
 
     public void Save()

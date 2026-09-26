@@ -36,6 +36,7 @@ public partial class App : Application
     DispatcherTimer? _updateTimer;
     UpdateInfo? _pendingUpdate;   // found automatically, not yet shown in the dialog
     UpdateWindow? _updateWindow;
+    IReadOnlyList<WhatsNew.Release>? _whatsNew;   // just updated: shown once the user opens the window
     bool _exiting;
     int _tick;
 
@@ -81,6 +82,7 @@ public partial class App : Application
 
         _settings = AppSettings.Load();
         Loc.Instance.Language = _settings.Language;
+        PrepareWhatsNew();
 
         _sensors = new SensorService();
         _sensors.Start();
@@ -120,6 +122,8 @@ public partial class App : Application
             _tray?.ShowBalloonTip(4000, "Pulse", Loc.T("HotkeysTaken") + string.Join(", ", failed), Forms.ToolTipIcon.Warning);
         else if (_fps.Error is { } err)
             _tray?.ShowBalloonTip(5000, "Pulse", err, Forms.ToolTipIcon.Info);
+        else if (_whatsNew != null && _settingsWindow?.IsVisible != true)
+            _tray?.ShowBalloonTip(6000, "Pulse", string.Format(Loc.T("TrayUpdated"), UpdateService.Current), Forms.ToolTipIcon.Info);
     }
 
     void OnTick(object? sender, EventArgs e)
@@ -192,6 +196,10 @@ public partial class App : Application
         // An update found while only the overlay was up: offer it now that the user is here.
         if (_pendingUpdate is { } update)
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => ShowUpdate(update)));
+
+        // Just updated: say what changed, once, now that the user is looking (never over a game).
+        if (_whatsNew != null)
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowWhatsNew));
     }
 
     // ───────────────────────── updates ─────────────────────────
@@ -244,6 +252,37 @@ public partial class App : Application
         };
         _updateWindow.Show();
         _updateWindow.Activate();
+    }
+
+    void PrepareWhatsNew()
+    {
+        if (_settings is null) return;
+
+        // A fresh install has nothing "new" to announce: start counting from this version.
+        if (_settings.FirstRun)
+        {
+            _settings.LastSeenVersion = UpdateService.Current.ToString();
+            _settings.Save();
+            return;
+        }
+
+        var releases = WhatsNew.Since(_settings.LastSeenVersion, UpdateService.Current);
+        if (releases.Count > 0) _whatsNew = releases;
+    }
+
+    void ShowWhatsNew()
+    {
+        if (_whatsNew is not { } releases || _settings is null) return;
+        _whatsNew = null;
+
+        _settings.LastSeenVersion = UpdateService.Current.ToString();
+        _settings.Save();
+
+        var window = new WhatsNewWindow(releases);
+        if (_settingsWindow?.IsVisible == true) window.Owner = _settingsWindow;
+        else window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        window.Show();
+        window.Activate();
     }
 
     // Closed, not hidden: the preview's bitmaps (tens of MB) must not live on next to a game.
@@ -340,8 +379,8 @@ public partial class App : Application
         };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleOverlay(); };
         _tray.MouseDoubleClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ShowSettings(); };
-        // the only balloon worth clicking is "update available": open the settings, which offers it
-        _tray.BalloonTipClicked += (_, _) => { if (_pendingUpdate != null) ShowSettings(); };
+        // the balloons worth clicking are "update available" and "updated": open the settings, which shows them
+        _tray.BalloonTipClicked += (_, _) => { if (_pendingUpdate != null || _whatsNew != null) ShowSettings(); };
     }
 
     /// <summary>Every tray item keeps its string key in Tag; re-read them after a language switch.</summary>
