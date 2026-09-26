@@ -14,7 +14,14 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
-        new(new Version(2, 3, 1), new[]
+        new(new Version(2, 5, 0), new[]
+        {
+            ("New: Pulse can show what limits your FPS: GPU-bound, CPU-bound or Capped (V-Sync or a frame limiter). " +
+             "Turn it on under Show on overlay → FPS.",
+             "جدید: Pulse می‌تواند نشان دهد چه چیزی FPS را محدود می‌کند: GPU-bound، CPU-bound یا Capped (V-Sync یا محدودکننده‌ی فریم). " +
+             "آن را از «آیتم‌های اورلی ← FPS» روشن کن."),
+        }),
+        new(new Version(2, 4, 0), new[]
         {
             ("GPU temperature on GeForce RTX 50 cards is now more precise.",
              "دمای کارت گرافیک روی سری GeForce RTX 50 حالا دقیق‌تر است."),

@@ -34,7 +34,9 @@ internal sealed class PreviewFeed
         foreach (double f in _frames) { avg += f; worst = Math.Max(worst, f); }
         avg /= _frames.Length;
 
-        var fps = new FpsStats(1000 / avg, 1000 / worst, avg, (double[])_frames.Clone());
+        // A busy GPU limits most scenes; a 60 fps scene below that is the game's own cap (Elden Ring).
+        Bottleneck bound = scene.GpuLoad >= 90 ? Bottleneck.Gpu : scene.Fps == 60 ? Bottleneck.Capped : Bottleneck.Cpu;
+        var fps = new FpsStats(1000 / avg, 1000 / worst, avg, (double[])_frames.Clone(), bound);
 
         float Wave(float center, float swing, double speed) => center + swing * (float)Math.Sin(_phase * speed);
 

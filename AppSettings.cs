@@ -30,6 +30,9 @@ public sealed class AppSettings
     public bool ShowCpu { get; set; } = true;
     public bool ShowRam { get; set; } = true;
 
+    /// <summary>GPU-bound / CPU-bound / Capped next to the FPS. Opt-in; hidden while PresentMon can't tell.</summary>
+    public bool ShowBottleneck { get; set; }
+
     /// <summary>GPU hot spot (junction) temp next to the core temp. Opt-in; hidden anyway on GPUs that don't report it.</summary>
     public bool ShowGpuHotspot { get; set; }
 

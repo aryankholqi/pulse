@@ -8,9 +8,12 @@ using System.Threading;
 
 namespace Pulse.Services;
 
-public readonly record struct FpsStats(double? Fps, double? Low1, double? FrameTimeMs, double[]? Graph)
+/// <summary>What holds the frame rate back.</summary>
+public enum Bottleneck { Gpu, Cpu, Capped }
+
+public readonly record struct FpsStats(double? Fps, double? Low1, double? FrameTimeMs, double[]? Graph, Bottleneck? Bound)
 {
-    public static readonly FpsStats Empty = new(null, null, null, null);
+    public static readonly FpsStats Empty = new(null, null, null, null, null);
 }
 
 /// <summary>
@@ -33,6 +36,8 @@ public sealed class FpsService : IDisposable
     const double StaleSeconds = 3;      // nothing from the target this long → paused / loading / minimised
     const double PresentingSeconds = 2; // "is this process drawing?" look-back
     const double MaxHistorySeconds = 15;
+    const double BoundWindowMs = 2000;  // bottleneck verdict: latest ~2 s of frames
+    const int BoundMinFrames = 10;
 
     readonly string _exePath;
     readonly string _args;
@@ -42,10 +47,14 @@ public sealed class FpsService : IDisposable
     readonly double[] _frameMs = new double[Capacity];
     readonly long[] _stamp = new long[Capacity];   // when the line reached us (staleness only)
     readonly int[] _pid = new int[Capacity];
+    readonly double[] _gpuBusyMs = new double[Capacity];  // NaN: PresentMon didn't report it
+    readonly double[] _cpuWaitMs = new double[Capacity];  // time blocked in Present(); NaN: not reported
     int _head, _count;
 
     int _foregroundPid;
     int _targetPid;                                // what the overlay shows; guarded by _gate
+    Bottleneck? _bound;                            // last verdict, for hysteresis; guarded by _gate
+    int _boundPid;
     Process? _proc;
     IntPtr _job;
     volatile bool _disposed;
@@ -94,7 +103,7 @@ public sealed class FpsService : IDisposable
 
     void ReadLoop()
     {
-        int pidCol = -1, frameCol = -1;
+        int pidCol = -1, frameCol = -1, gpuBusyCol = -1, cpuWaitCol = -1;
         bool haveHeader = false;
 
         try
@@ -107,7 +116,7 @@ public sealed class FpsService : IDisposable
 
                 if (line.StartsWith("Application,", StringComparison.Ordinal))
                 {
-                    haveHeader = TryParseHeader(line, out pidCol, out frameCol);
+                    haveHeader = TryParseHeader(line, out pidCol, out frameCol, out gpuBusyCol, out cpuWaitCol);
                     continue;
                 }
                 if (!haveHeader) continue;
@@ -122,12 +131,17 @@ public sealed class FpsService : IDisposable
                     || ms <= 0 || ms > 5000)
                     continue;
 
+                double gpuBusy = OptionalMs(line, gpuBusyCol);
+                double cpuWait = OptionalMs(line, cpuWaitCol);
+
                 long now = Stopwatch.GetTimestamp();
                 lock (_gate)
                 {
                     _frameMs[_head] = ms;
                     _stamp[_head] = now;
                     _pid[_head] = pid;
+                    _gpuBusyMs[_head] = gpuBusy;
+                    _cpuWaitMs[_head] = cpuWait;
                     _head = (_head + 1) % Capacity;
                     if (_count < Capacity) _count++;
                 }
@@ -143,24 +157,35 @@ public sealed class FpsService : IDisposable
         }
     }
 
-    /// <summary>Supports both PresentMon 1.x (MsBetweenPresents) and 2.x (FrameTime) CSV headers.</summary>
-    static bool TryParseHeader(string header, out int pidCol, out int frameCol)
+    /// <summary>
+    /// Supports PresentMon 1.x (MsBetweenPresents) and 2.x (FrameTime, later MsBetweenAppStart) CSV headers.
+    /// GPU busy and CPU wait feed the bottleneck verdict; -1 when this PresentMon doesn't write them.
+    /// </summary>
+    static bool TryParseHeader(string header, out int pidCol, out int frameCol, out int gpuBusyCol, out int cpuWaitCol)
     {
-        pidCol = frameCol = -1;
         string[] cols = header.Split(',');
-        string[] frameNames = { "MsBetweenPresents", "FrameTime", "MsBetweenAppStart" };
-
-        for (int i = 0; i < cols.Length; i++)
-            if (cols[i].Equals("ProcessID", StringComparison.OrdinalIgnoreCase)) { pidCol = i; break; }
-
-        foreach (var name in frameNames)
-        {
-            for (int i = 0; i < cols.Length; i++)
-                if (cols[i].Equals(name, StringComparison.OrdinalIgnoreCase)) { frameCol = i; break; }
-            if (frameCol >= 0) break;
-        }
+        pidCol = Column(cols, "ProcessID");
+        frameCol = Column(cols, "MsBetweenPresents", "FrameTime", "MsBetweenAppStart");
+        gpuBusyCol = Column(cols, "MsGPUBusy", "GPUBusy", "msGPUActive");
+        cpuWaitCol = Column(cols, "MsCPUWait", "CPUWait", "MsInPresentAPI");
         return pidCol >= 0 && frameCol >= 0;
     }
+
+    /// <summary>Index of the first of <paramref name="names"/> (in priority order) the header has, or -1.</summary>
+    static int Column(string[] cols, params string[] names)
+    {
+        foreach (var name in names)
+            for (int i = 0; i < cols.Length; i++)
+                if (cols[i].Equals(name, StringComparison.OrdinalIgnoreCase)) return i;
+        return -1;
+    }
+
+    /// <summary>A millisecond field that may be missing or "NA" → NaN.</summary>
+    static double OptionalMs(string line, int col) =>
+        col >= 0 && TryField(line, col, out var span)
+        && double.TryParse(span, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) && v >= 0
+            ? v
+            : double.NaN;
 
     /// <summary>Allocation-free CSV field lookup.</summary>
     static bool TryField(ReadOnlySpan<char> line, int index, out ReadOnlySpan<char> field)
@@ -239,18 +264,27 @@ public sealed class FpsService : IDisposable
                 int n = 0;
                 double total = 0;
                 long newestStamp = 0;
+                var window = new BoundWindow();
                 for (int k = 0; k < _count && total < 10_000; k++)
                 {
                     int i = (_head - 1 - k + Capacity) % Capacity;
                     if (_stamp[i] < oldest) break;
                     if (_pid[i] != target) continue;
                     if (n == 0) newestStamp = _stamp[i];
+                    if (total < BoundWindowMs) window.Add(_frameMs[i], _gpuBusyMs[i], _cpuWaitMs[i]);
                     frames[n++] = _frameMs[i];
                     total += _frameMs[i];
                 }
 
                 // Nothing new for a while: paused, loading or minimised — not a hiccup in delivery.
-                if (n == 0 || now - newestStamp > freq * StaleSeconds) return FpsStats.Empty;
+                if (n == 0 || now - newestStamp > freq * StaleSeconds)
+                {
+                    _bound = null;
+                    return FpsStats.Empty;
+                }
+
+                if (_boundPid != target) { _bound = null; _boundPid = target; }
+                _bound = window.Frames >= BoundMinFrames ? window.Classify(_bound) : null;
 
                 // FPS and frame time over the latest ~1 s of frames.
                 double sum1 = 0;
@@ -272,12 +306,52 @@ public sealed class FpsService : IDisposable
                     low = 1000.0 / frames[idx];
                 }
 
-                return new FpsStats(fps, low, frameTime, graph);
+                return new FpsStats(fps, low, frameTime, graph, _bound);
             }
             finally
             {
                 ArrayPool<double>.Shared.Return(frames);
             }
+        }
+    }
+
+    /// <summary>
+    /// Which side holds the frame rate back, judged from PresentMon's per-frame timings:
+    ///  • GPU busy for (nearly) the whole frame → the GPU is the limit.
+    ///  • Frames paced like clockwork → something holds them back on purpose: V-Sync or a frame limiter.
+    ///  • CPU parked inside Present() → not the CPU: a mostly busy GPU with gaps (still GPU),
+    ///    or else the display / a limiter making it wait (capped).
+    ///  • GPU left idle otherwise → it's waiting on the CPU.
+    /// The current verdict gets some slack, so a scene on the edge doesn't flicker.
+    /// </summary>
+    struct BoundWindow
+    {
+        double _frame, _frameSq, _gpuBusy, _cpuWait;
+        public int Frames { get; private set; }
+
+        /// <summary>Frames without a GPU busy time (older PresentMon, "NA") are left out.</summary>
+        public void Add(double frameMs, double gpuBusyMs, double cpuWaitMs)
+        {
+            if (double.IsNaN(gpuBusyMs)) return;
+            _frame += frameMs;
+            _frameSq += frameMs * frameMs;
+            _gpuBusy += gpuBusyMs;
+            if (!double.IsNaN(cpuWaitMs)) _cpuWait += cpuWaitMs;
+            Frames++;
+        }
+
+        public readonly Bottleneck Classify(Bottleneck? current)
+        {
+            double gpuShare = _gpuBusy / _frame;
+            if (gpuShare >= (current == Bottleneck.Gpu ? 0.80 : 0.90)) return Bottleneck.Gpu;
+
+            // Frame-to-frame spread relative to the mean: V-Sync and limiters sit well under 1.5%.
+            double mean = _frame / Frames;
+            double spread = Math.Sqrt(Math.Max(0, _frameSq / Frames - mean * mean)) / mean;
+            if (spread <= (current == Bottleneck.Capped ? 0.025 : 0.015)) return Bottleneck.Capped;
+
+            if (_cpuWait / _frame >= 0.25) return gpuShare >= 0.75 ? Bottleneck.Gpu : Bottleneck.Capped;
+            return Bottleneck.Cpu;
         }
     }
 

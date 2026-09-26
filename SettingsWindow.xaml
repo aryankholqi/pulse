@@ -136,6 +136,16 @@
                                     <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </CheckBox>
+
+                            <!-- FPS extras: nested under FPS, shown only while it's on -->
+                            <Border x:Name="FpsExtras" Margin="24,0,0,6" Padding="6,0,0,0"
+                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
+                                <CheckBox x:Name="FpsBottleneck" Style="{StaticResource SubRowSwitch}" ToolTip="{local:T BottleneckTip}">
+                                    <TextBlock TextTrimming="CharacterEllipsis">
+                                        <Run Text="{local:T Bottleneck}" /><Run Text="   " /><Run Text="{local:T BottleneckHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
+                                    </TextBlock>
+                                </CheckBox>
+                            </Border>
                             <Border Style="{StaticResource RowRule}" />
 
                             <CheckBox x:Name="MetricGpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">

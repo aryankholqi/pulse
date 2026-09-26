@@ -76,6 +76,10 @@
                         <DockPanel LastChildFill="True">
                             <Ellipse DockPanel.Dock="Left" Width="6" Height="6" Fill="{Binding FpsBrush}"
                                      VerticalAlignment="Center" Margin="0,1,8,0" />
+                            <!-- what limits the frame rate: opt-in -->
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding BottleneckText}" Foreground="{Binding BottleneckBrush}"
+                                       Visibility="{Binding BottleneckVisibility}" Style="{StaticResource Note}"
+                                       FontWeight="SemiBold" TextTrimming="None" Margin="8,0,0,0" />
                             <TextBlock Text="{Binding TargetName}" Style="{StaticResource Note}" Foreground="{StaticResource Soft}" />
                         </DockPanel>
 
@@ -198,6 +202,8 @@
                     <StackPanel x:Name="CompactFps" Orientation="Horizontal">
                         <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}" Style="{StaticResource Figure}" FontSize="18" />
                         <TextBlock Text="fps" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
+                        <TextBlock Text="{Binding BottleneckText}" Foreground="{Binding BottleneckBrush}" Visibility="{Binding BottleneckVisibility}"
+                                   FontSize="10" FontWeight="SemiBold" VerticalAlignment="Bottom" Margin="7,0,0,3" />
                     </StackPanel>
 
                     <StackPanel x:Name="CompactGpu" Orientation="Horizontal">

@@ -14,6 +14,7 @@ namespace Pulse;
 internal static class Palette
 {
     public static readonly Brush Muted = Make(0x5E, 0x66, 0x80);
+    public static readonly Brush Soft = Make(0xA3, 0xAA, 0xC2);
     public static readonly Brush Cool = Make(0x8F, 0xD8, 0xC8);   // thermal: comfortable
     public static readonly Brush Warm = Make(0xF3, 0xC1, 0x6E);   // thermal: working hard
     public static readonly Brush Hot = Make(0xFF, 0x74, 0x6C);    // thermal: throttling territory
@@ -80,11 +81,28 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     bool _fpsWarnings = true;
     double? _fps;
 
+    // bottleneck: opt-in, wears the limiting device's hue; collapsed while there's no verdict
+    string _bottleneckText = "";
+    Brush _bottleneckBrush = Palette.Soft;
+    Visibility _bottleneckVisibility = Visibility.Collapsed;
+    bool _showBottleneck;
+    Bottleneck? _bound;
+    Brush _gpuHue = ColorUtil.Solid(ColorUtil.Parse(AppSettings.DefaultGpuColor, AppSettings.DefaultGpuColor));
+    Brush _cpuHue = ColorUtil.Solid(ColorUtil.Parse(AppSettings.DefaultCpuColor, AppSettings.DefaultCpuColor));
+
+    public string BottleneckText { get => _bottleneckText; private set => Set(ref _bottleneckText, value); }
+    public Brush BottleneckBrush { get => _bottleneckBrush; private set => Set(ref _bottleneckBrush, value); }
+    public Visibility BottleneckVisibility { get => _bottleneckVisibility; private set => Set(ref _bottleneckVisibility, value); }
+
     public void ApplyStyle(AppSettings settings)
     {
         _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(settings.FpsColor, AppSettings.DefaultFpsColor));
         _fpsWarnings = settings.FpsWarnings;
         FpsBrush = Palette.ForFps(_fps, _fpsSmooth, _fpsWarnings);
+        _gpuHue = ColorUtil.Solid(ColorUtil.Parse(settings.GpuColor, AppSettings.DefaultGpuColor));
+        _cpuHue = ColorUtil.Solid(ColorUtil.Parse(settings.CpuColor, AppSettings.DefaultCpuColor));
+        _showBottleneck = settings.ShowBottleneck;
+        RefreshBottleneck();
         _showHotspot = settings.ShowGpuHotspot;
         RefreshHotspotVisibility();
         _showCompactVram = settings.ShowCompactVram;
@@ -152,6 +170,8 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         _fps = fps.Fps;
         FpsBrush = Palette.ForFps(fps.Fps, _fpsSmooth, _fpsWarnings);
         FrameTimes = fps.Graph;
+        _bound = fps.Bound;
+        RefreshBottleneck();
         TargetName = live && target.Length > 0 ? target : fpsError ?? "Waiting for a game";
 
         if (hw is null) return;
@@ -184,6 +204,24 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         RamLoadText = Pct(hw.RamLoad);
         RamUsedText = hw.RamUsedGb is float u ? u.ToString("0.0", Inv) + "G" : Dash;
         RamTotalText = hw.RamTotalGb is float t ? $"of {t.ToString("0", Inv)} GB" : "";
+    }
+
+    void RefreshBottleneck()
+    {
+        BottleneckText = _bound switch
+        {
+            Bottleneck.Gpu => "GPU-bound",
+            Bottleneck.Cpu => "CPU-bound",
+            Bottleneck.Capped => "Capped",
+            _ => "",
+        };
+        BottleneckBrush = _bound switch
+        {
+            Bottleneck.Gpu => _gpuHue,
+            Bottleneck.Cpu => _cpuHue,
+            _ => Palette.Soft,
+        };
+        BottleneckVisibility = _showBottleneck && _bound is not null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void RefreshHotspotVisibility() =>

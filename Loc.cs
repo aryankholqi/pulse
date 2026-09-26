@@ -53,6 +53,14 @@ public sealed class Loc : INotifyPropertyChanged
         ["MetricGpuHint"] = ("Temperature, usage, VRAM", "دما، مصرف، VRAM"),
         ["MetricCpuHint"] = ("Temperature, usage", "دما، مصرف"),
         ["MetricRamHint"] = ("Memory used", "حافظه‌ی مصرفی"),
+        ["Bottleneck"] = ("What limits your FPS", "چه چیزی FPS را محدود می‌کند"),
+        ["BottleneckHint"] = ("GPU-bound, CPU-bound or capped", "GPU-bound، CPU-bound یا Capped"),
+        ["BottleneckTip"] = ("GPU-bound: a faster GPU or lower graphics settings would raise FPS.\n" +
+                             "CPU-bound: the processor holds the GPU back, so lowering graphics won't help much.\n" +
+                             "Capped: V-Sync or a frame limiter is holding FPS on purpose.",
+                             "GPU-bound: کارت گرافیک قوی‌تر یا تنظیمات گرافیکی پایین‌تر FPS را بالا می‌برد.\n" +
+                             "CPU-bound: پردازنده جلوی کارت گرافیک را گرفته و پایین آوردن گرافیک کمک زیادی نمی‌کند.\n" +
+                             "Capped: V-Sync یا محدودکننده‌ی فریم عمداً FPS را نگه داشته است."),
         ["GpuHotspot"] = ("Hot spot temperature", "دمای هات‌اسپات"),
         ["CompactVram"] = ("VRAM in compact layout", "VRAM در حالت فشرده"),
         ["CompactVramHint"] = ("The full layout always shows VRAM", "حالت کامل همیشه VRAM را نشان می‌دهد"),

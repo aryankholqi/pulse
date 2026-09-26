@@ -239,6 +239,7 @@ public partial class SettingsWindow : Window
         (_settings.Compact ? LayoutCompact : LayoutFull).IsChecked = true;
 
         foreach (var (box, get, _) in Metrics) box.IsChecked = get();
+        FpsBottleneck.IsChecked = _settings.ShowBottleneck;
         GpuHotspot.IsChecked = _settings.ShowGpuHotspot;
         CompactVram.IsChecked = _settings.ShowCompactVram;
         RefreshMetricLocks();
@@ -273,6 +274,7 @@ public partial class SettingsWindow : Window
 
         foreach (var (box, _, set) in Metrics)
             OnSwitch(box, on => { set(on); RefreshMetricLocks(); Commit(); });
+        OnSwitch(FpsBottleneck, on => { _settings.ShowBottleneck = on; Commit(); });
         OnSwitch(GpuHotspot, on => { _settings.ShowGpuHotspot = on; Commit(); });
         OnSwitch(CompactVram, on => { _settings.ShowCompactVram = on; Commit(); });
 
@@ -344,6 +346,7 @@ public partial class SettingsWindow : Window
             if (locked) box.SetBinding(ToolTipProperty, new System.Windows.Data.Binding("[MetricsLocked]") { Source = Loc.Instance });
             else box.ClearValue(ToolTipProperty);
         }
+        FpsExtras.Visibility = _settings.ShowFps ? Visibility.Visible : Visibility.Collapsed;
         GpuExtras.Visibility = _settings.ShowGpu ? Visibility.Visible : Visibility.Collapsed;
     }
 

@@ -31,6 +31,7 @@ Pulse shows your frame rate, frame times and hardware vitals in a small, clean c
 | **FPS** | Live frame rate of the game you're playing, averaged over the last second |
 | **1% low** | The frame rate of your slowest 1% of frames over the last 10 seconds, the best single number for stutter |
 | **Frame time** | Average milliseconds per frame, plus a live frame-time graph |
+| **Bottleneck** | Optional: whether the game is *GPU-bound*, *CPU-bound* or *Capped* (V-Sync or a frame limiter) |
 | **GPU** | Temperature, optional hot spot (where the card reports it), usage, model name and VRAM used / total (VRAM optional in compact mode) |
 | **CPU** | Temperature, usage and model name |
 | **RAM** | Memory used, percentage and total installed |
@@ -124,6 +125,8 @@ To open the customize window at any time, **double-click the tray icon**, choose
 ### Show on overlay
 Switch **FPS**, **GPU**, **CPU** and **RAM** on or off to choose what the overlay shows, in both layouts. At least two must stay on, so the last two switches lock until you turn another one back on.
 
+Under **FPS**, **What limits your FPS** adds a *GPU-bound*, *CPU-bound* or *Capped* tag next to the frame rate.
+
 ### Position on screen
 Top left · Top center · Top right · Bottom left · Bottom center · Bottom right.
 The overlay sits 16 px from the screen edge and repositions itself if you change resolution.
@@ -191,6 +194,10 @@ Go to **Settings → Apps → Installed apps → Pulse → Uninstall**. The unin
 - **fps**: current frame rate. A dash (**–**) means no game is drawing frames (on the desktop, loading, or paused).
 - **1% low**: if this is much lower than your average FPS, you're feeling stutter even when the average looks fine.
 - **Frame time graph**: a flat line is smooth. Spikes are hitches.
+- **GPU-bound / CPU-bound / Capped** (optional): what holds your FPS back, judged from how long the GPU is busy on each frame.
+  - *GPU-bound*: the GPU is working flat out. Lower graphics settings or resolution to gain FPS.
+  - *CPU-bound*: the GPU is left waiting on the processor. Lowering graphics won't help much; lower CPU-heavy settings (crowds, view distance, simulation) instead.
+  - *Capped*: V-Sync or a frame limiter is holding FPS on purpose. Neither side is maxed out.
 - **Temperatures**: 🟢 below 72 °C comfortable · 🟡 72–84 °C working hard · 🔴 85 °C and above, likely to throttle.
 - **"Waiting for a game"**: Pulse is running but hasn't seen a game render yet.
 
