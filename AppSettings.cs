@@ -42,6 +42,9 @@ public sealed class AppSettings
     [JsonIgnore]
     public int MetricCount => (ShowFps ? 1 : 0) + (ShowGpu ? 1 : 0) + (ShowCpu ? 1 : 0) + (ShowRam ? 1 : 0);
 
+    /// <summary>When a game closes, show how the session went. Sessions are recorded either way (tray → last summary).</summary>
+    public bool ShowSessionSummary { get; set; } = true;
+
     /// <summary>Open the customise window on launch (logon starts skip it: see <c>--tray</c>).</summary>
     public bool ShowSettingsOnLaunch { get; set; } = true;
 

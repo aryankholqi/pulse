@@ -52,14 +52,21 @@ public sealed class FpsService : IDisposable
     int _head, _count;
 
     int _foregroundPid;
+    IntPtr _foregroundWindow;                      // the foreground pid's window (not ours)
     int _targetPid;                                // what the overlay shows; guarded by _gate
     Bottleneck? _bound;                            // last verdict, for hysteresis; guarded by _gate
     int _boundPid;
+    IntPtr _monitor;                               // the target's monitor; UI thread only
+    long _refreshCheckedAt;
+    volatile int _refreshHz;                       // its refresh rate, 0 = unknown
     Process? _proc;
     IntPtr _job;
     volatile bool _disposed;
 
     public string TargetName { get; private set; } = "";
+
+    /// <summary>Whole game sessions, for the summary after each game.</summary>
+    public SessionTracker Sessions { get; } = new();
     public string? Error { get; private set; }
 
     public FpsService(string exePath, string args)
@@ -145,6 +152,7 @@ public sealed class FpsService : IDisposable
                     _head = (_head + 1) % Capacity;
                     if (_count < Capacity) _count++;
                 }
+                Sessions.OnFrame(pid, ms, gpuBusy, cpuWait);
             }
         }
         catch { /* stream closed */ }
@@ -213,24 +221,42 @@ public sealed class FpsService : IDisposable
         if (hwnd != IntPtr.Zero)
         {
             Native.GetWindowThreadProcessId(hwnd, out uint raw);
-            if ((int)raw != _selfPid && raw != 0) _foregroundPid = (int)raw;
+            if ((int)raw != _selfPid && raw != 0) { _foregroundPid = (int)raw; _foregroundWindow = hwnd; }
         }
 
-        int fg = _foregroundPid, previous;
+        int fg = _foregroundPid, previous, target;
         lock (_gate)
         {
-            previous = _targetPid;
-            if (fg == 0 || fg == _targetPid) return;
-
-            long since = Stopwatch.GetTimestamp() - (long)(Stopwatch.Frequency * PresentingSeconds);
-            if (IsPresenting(fg, since) || !IsPresenting(_targetPid, since))
-                _targetPid = fg;
-            if (_targetPid == previous) return;
+            previous = target = _targetPid;
+            if (fg != 0 && fg != _targetPid)
+            {
+                long since = Stopwatch.GetTimestamp() - (long)(Stopwatch.Frequency * PresentingSeconds);
+                if (IsPresenting(fg, since) || !IsPresenting(_targetPid, since))
+                    target = _targetPid = fg;
+            }
         }
+
+        if (target == fg && _foregroundWindow != IntPtr.Zero) UpdateRefreshRate(_foregroundWindow);
+
+        Sessions.Follow(fg, target, _foregroundWindow);
+        if (target == previous) return;
 
         string name = "";
         try { using var p = Process.GetProcessById(fg); name = p.ProcessName; } catch { }
         TargetName = name;
+    }
+
+    /// <summary>The game's monitor refresh rate, for telling V-Sync apart. Re-read on a monitor change or every few seconds.</summary>
+    void UpdateRefreshRate(IntPtr window)
+    {
+        IntPtr monitor = Native.MonitorOf(window);
+        long now = Stopwatch.GetTimestamp();
+        if (monitor == _monitor && now - _refreshCheckedAt < Stopwatch.Frequency * 5) return;
+
+        _monitor = monitor;
+        _refreshCheckedAt = now;
+        _refreshHz = monitor != IntPtr.Zero ? Native.RefreshRate(monitor) : 0;
+        Sessions.RefreshHz = _refreshHz;
     }
 
     // Caller holds _gate.
@@ -284,7 +310,7 @@ public sealed class FpsService : IDisposable
                 }
 
                 if (_boundPid != target) { _bound = null; _boundPid = target; }
-                _bound = window.Frames >= BoundMinFrames ? window.Classify(_bound) : null;
+                _bound = window.Frames >= BoundMinFrames ? window.Classify(_bound, _refreshHz) : null;
 
                 // FPS and frame time over the latest ~1 s of frames.
                 double sum1 = 0;
@@ -312,46 +338,6 @@ public sealed class FpsService : IDisposable
             {
                 ArrayPool<double>.Shared.Return(frames);
             }
-        }
-    }
-
-    /// <summary>
-    /// Which side holds the frame rate back, judged from PresentMon's per-frame timings:
-    ///  • GPU busy for (nearly) the whole frame → the GPU is the limit.
-    ///  • Frames paced like clockwork → something holds them back on purpose: V-Sync or a frame limiter.
-    ///  • CPU parked inside Present() → not the CPU: a mostly busy GPU with gaps (still GPU),
-    ///    or else the display / a limiter making it wait (capped).
-    ///  • GPU left idle otherwise → it's waiting on the CPU.
-    /// The current verdict gets some slack, so a scene on the edge doesn't flicker.
-    /// </summary>
-    struct BoundWindow
-    {
-        double _frame, _frameSq, _gpuBusy, _cpuWait;
-        public int Frames { get; private set; }
-
-        /// <summary>Frames without a GPU busy time (older PresentMon, "NA") are left out.</summary>
-        public void Add(double frameMs, double gpuBusyMs, double cpuWaitMs)
-        {
-            if (double.IsNaN(gpuBusyMs)) return;
-            _frame += frameMs;
-            _frameSq += frameMs * frameMs;
-            _gpuBusy += gpuBusyMs;
-            if (!double.IsNaN(cpuWaitMs)) _cpuWait += cpuWaitMs;
-            Frames++;
-        }
-
-        public readonly Bottleneck Classify(Bottleneck? current)
-        {
-            double gpuShare = _gpuBusy / _frame;
-            if (gpuShare >= (current == Bottleneck.Gpu ? 0.80 : 0.90)) return Bottleneck.Gpu;
-
-            // Frame-to-frame spread relative to the mean: V-Sync and limiters sit well under 1.5%.
-            double mean = _frame / Frames;
-            double spread = Math.Sqrt(Math.Max(0, _frameSq / Frames - mean * mean)) / mean;
-            if (spread <= (current == Bottleneck.Capped ? 0.025 : 0.015)) return Bottleneck.Capped;
-
-            if (_cpuWait / _frame >= 0.25) return gpuShare >= 0.75 ? Bottleneck.Gpu : Bottleneck.Capped;
-            return Bottleneck.Cpu;
         }
     }
 

@@ -37,6 +37,9 @@ public partial class App : Application
     UpdateInfo? _pendingUpdate;   // found automatically, not yet shown in the dialog
     UpdateWindow? _updateWindow;
     IReadOnlyList<WhatsNew.Release>? _whatsNew;   // just updated: shown once the user opens the window
+    GameSession? _pendingSummary;                  // a game ended while another one was in front
+    SessionSummaryWindow? _summaryWindow;
+    SavedSummariesWindow? _savedWindow;
     bool _exiting;
     int _tick;
 
@@ -86,6 +89,7 @@ public partial class App : Application
 
         _sensors = new SensorService();
         _sensors.Start();
+        MemoryModules.LoadInBackground(); // RAM type, speed and channels for the game summary
 
         _fps = new FpsService(AppSettings.Resolve(_settings.PresentMonPath), _settings.PresentMonArgs);
         _fps.Start();
@@ -128,13 +132,91 @@ public partial class App : Application
 
     void OnTick(object? sender, EventArgs e)
     {
-        if (_window is null || _fps is null || _sensors is null || !_window.IsVisible) return;
+        if (_window is null || _fps is null || _sensors is null) return;
+        _tick++;
 
+        // Game sessions are followed even with the overlay hidden: PresentMon runs anyway,
+        // and following the foreground window is a couple of cheap calls.
         _fps.UpdateTarget();
+        if (!_sensors.Paused && _sensors.Latest is { } hw) _fps.Sessions.Sample(hw);
+        if (_tick % 4 == 0) CollectSessions();
+
+        if (!_window.IsVisible) return;
         _window.ViewModel.Apply(_sensors.Latest, _fps.GetStats(), _fps.TargetName, _fps.Error);
 
         // Some games re-assert their own z-order; nudge ours back every ~3 s.
-        if (++_tick % 6 == 0) _window.EnsureTopmost();
+        if (_tick % 6 == 0) _window.EnsureTopmost();
+    }
+
+    // ───────────────────────── game sessions ─────────────────────────
+
+    /// <summary>
+    /// Every ~2 s: games that closed → history, and the summary for the latest one. One held back
+    /// because another game was in front shows as soon as that game is closed or left.
+    /// </summary>
+    void CollectSessions()
+    {
+        if (_fps is null || _settings is null) return;
+        var ended = _fps.Sessions.TakeEnded();
+        foreach (var session in ended) SessionHistory.Add(session);
+        if (!_settings.ShowSessionSummary) return;
+
+        if (ended.Count == 0)
+        {
+            if (_pendingSummary is { } pending && !_fps.Sessions.GameInFront) ShowSummary(pending);
+            return;
+        }
+
+        var latest = ended[^1];
+        if (_fps.Sessions.GameInFront)
+        {
+            // Already in another game: never pop a window over it. A tray note it is, until that game is over.
+            _pendingSummary = latest;
+            _tray?.ShowBalloonTip(6000, "Pulse", string.Format(Loc.T("TraySummaryReady"), latest.Game), Forms.ToolTipIcon.Info);
+        }
+        else ShowSummary(latest);
+    }
+
+    void ShowSummary(GameSession session)
+    {
+        if (_settings is null) return;
+        _pendingSummary = null;
+        _summaryWindow?.Close(); // one at a time: the newest wins
+
+        var window = new SessionSummaryWindow(session, SessionHistory.Previous(session), _settings);
+        window.SettingChanged += () =>
+        {
+            _settings.Save();
+            _settingsWindow?.SyncSummarySwitch();
+        };
+        window.Closed += (_, _) => { if (_summaryWindow == window) _summaryWindow = null; };
+        _summaryWindow = window;
+
+        // Pulse runs in the background, so Windows won't hand it the foreground: sit on top until shown.
+        window.Topmost = true;
+        window.ContentRendered += (_, _) => window.Topmost = false;
+        window.Show();
+        window.Activate();
+    }
+
+    void ShowLastSummary()
+    {
+        if (_pendingSummary is { } pending) { ShowSummary(pending); return; }
+        if (SessionHistory.Latest is { } last) ShowSummary(last);
+        else _tray?.ShowBalloonTip(5000, "Pulse", Loc.T("TrayNoSummary"), Forms.ToolTipIcon.Info);
+    }
+
+    void ShowSavedSummaries()
+    {
+        if (_savedWindow != null) { _savedWindow.Activate(); return; }
+
+        var window = new SavedSummariesWindow(ShowSummary);
+        window.Closed += (_, _) => _savedWindow = null;
+        _savedWindow = window;
+        window.Topmost = true; // same as the summary: Windows won't hand a background app the foreground
+        window.ContentRendered += (_, _) => window.Topmost = false;
+        window.Show();
+        window.Activate();
     }
 
     // ───────────────────────── actions ─────────────────────────
@@ -186,6 +268,8 @@ public partial class App : Application
             };
             _settingsWindow.QuitRequested += Quit;
             _settingsWindow.UpdateFound += ShowUpdate;
+            _settingsWindow.SummaryRequested += ShowSummary;
+            _settingsWindow.LastSummaryRequested += ShowLastSummary;
             _settingsWindow.Closed += OnSettingsClosed;
         }
 
@@ -355,12 +439,16 @@ public partial class App : Application
         var miCorner = Choice("TrayCorner", Array.ConvertAll(Enum.GetValues<Corner>(), c => (c.ToString(), c)),
             () => _settings!.Corner, v => { _settings!.Corner = v; Commit(); });
 
+        var miSummary = Item("TrayLastSummary", ShowLastSummary);
+        var miSaved = Item("TraySaved", ShowSavedSummaries);
+
         var miExit = Item("TrayExit", Quit);
 
         _trayMenu.Items.AddRange(new Forms.ToolStripItem[]
         {
             miSettings, new Forms.ToolStripSeparator(),
             miToggle, miCompact, miCorner, new Forms.ToolStripSeparator(),
+            miSummary, miSaved, new Forms.ToolStripSeparator(),
             miExit,
         });
         _trayMenu.Opening += (_, _) =>
@@ -379,8 +467,12 @@ public partial class App : Application
         };
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleOverlay(); };
         _tray.MouseDoubleClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ShowSettings(); };
-        // the balloons worth clicking are "update available" and "updated": open the settings, which shows them
-        _tray.BalloonTipClicked += (_, _) => { if (_pendingUpdate != null || _whatsNew != null) ShowSettings(); };
+        // the balloons worth clicking: a game summary, or "update available" / "updated" (the settings window shows those)
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            if (_pendingSummary is { } summary) ShowSummary(summary);
+            else if (_pendingUpdate != null || _whatsNew != null) ShowSettings();
+        };
     }
 
     /// <summary>Every tray item keeps its string key in Tag; re-read them after a language switch.</summary>
@@ -456,6 +548,10 @@ public partial class App : Application
             _tray.Icon?.Dispose();
             _tray.Dispose();
         }
+
+        // a game still running: keep its session in the history (no window, we're leaving)
+        if (_fps != null)
+            foreach (var session in _fps.Sessions.FinishAll()) SessionHistory.Add(session);
 
         _fps?.Dispose();
         _sensors?.Dispose();

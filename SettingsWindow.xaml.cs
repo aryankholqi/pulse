@@ -48,6 +48,9 @@ public partial class SettingsWindow : Window
     public event Action? QuitRequested;
     /// <summary>"Check now" found a newer release: the app shows the update dialog.</summary>
     public event Action<UpdateInfo>? UpdateFound;
+    /// <summary>A saved game summary was clicked: the app opens it.</summary>
+    public event Action<GameSession>? SummaryRequested;
+    public event Action? LastSummaryRequested;
 
     public SettingsWindow(AppSettings settings, Func<HardwareSnapshot?> realHardware, Func<bool> overlayRunning)
     {
@@ -256,6 +259,7 @@ public partial class SettingsWindow : Window
         RefreshSliderLabels();
 
         ShowOnLaunch.IsChecked = _settings.ShowSettingsOnLaunch;
+        ShowSummary.IsChecked = _settings.ShowSessionSummary;
         AutoUpdate.IsChecked = _settings.CheckForUpdates;
         SetUpdateStatus("VersionLabel", UpdateService.Current);
         HudToggle.IsChecked = _settings.PreviewHud;
@@ -275,6 +279,7 @@ public partial class SettingsWindow : Window
         foreach (var (box, _, set) in Metrics)
             OnSwitch(box, on => { set(on); RefreshMetricLocks(); Commit(); });
         OnSwitch(FpsBottleneck, on => { _settings.ShowBottleneck = on; Commit(); });
+        BottleneckGuideButton.Click += (_, _) => new BottleneckGuideWindow(_settings) { Owner = this }.ShowDialog();
         OnSwitch(GpuHotspot, on => { _settings.ShowGpuHotspot = on; Commit(); });
         OnSwitch(CompactVram, on => { _settings.ShowCompactVram = on; Commit(); });
 
@@ -291,7 +296,10 @@ public partial class SettingsWindow : Window
         OpacitySlider.ValueChanged += (_, e) => { _settings.BackgroundOpacity = Math.Round(e.NewValue, 2); RefreshSliderLabels(); Commit(); };
 
         OnSwitch(ShowOnLaunch, on => { _settings.ShowSettingsOnLaunch = on; Save(); });
+        OnSwitch(ShowSummary, on => { _settings.ShowSessionSummary = on; Save(); });
         OnSwitch(AutoUpdate, on => { _settings.CheckForUpdates = on; Save(); });
+        SavedList.Open += session => SummaryRequested?.Invoke(session);
+        LastSummaryButton.Click += (_, _) => LastSummaryRequested?.Invoke();
         CheckUpdates.Click += async (_, _) => await CheckForUpdate();
         StartWithWindows.Click += async (_, _) =>
         {
@@ -392,6 +400,9 @@ public partial class SettingsWindow : Window
         Save();
         LanguageChanged?.Invoke();
     }
+
+    /// <summary>"Show after every game" was flipped in a summary window.</summary>
+    public void SyncSummarySwitch() => ShowSummary.IsChecked = _settings.ShowSessionSummary;
 
     void Commit()
     {

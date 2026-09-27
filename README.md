@@ -47,6 +47,19 @@ Pulse shows your frame rate, frame times and hardware vitals in a small, clean c
 - **Ignores interruptions.** A notification, launcher or chat window popping up doesn't steal the counter from your game.
 - **Knows when a game is paused.** When a game stops presenting frames (loading, paused, minimized), the counter shows a dash instead of a misleading number.
 
+### A summary after every game
+
+When you close a game, Pulse shows how the session went (every time, even a short run; a windowed game needs 2 minutes of play):
+
+- **A verdict**: *Smooth*, *A few hitches* or *Stuttery*, judged from the 1% low against the average and how often it hitched.
+- **Average FPS, 1% low, 0.1% low and stutters** for the whole session, each with how it changed since your last session of the same game (▲ better, ▼ worse).
+- **FPS over the session**: a timeline you can hover to see any moment, with the session average marked.
+- **What limited your FPS**: how much of the session was *GPU-bound*, *CPU-bound* or *Capped*.
+- **Hardware**: average and peak GPU / CPU temperature, average usage and peak VRAM.
+- **For next time**: up to three plain tips, such as lowering textures when VRAM was full, cooling when the GPU ran hot, or an FPS limit when frame rate jumped around.
+
+Only the time the game was in front counts: alt-tabbed and paused time are left out. If you've already started another game, Pulse doesn't pop up over it. It leaves a tray note you can click instead. Reopen the latest summary any time from the tray menu (**Last game summary…**), and turn the automatic window off in **General** or in the summary itself. The last 100 sessions are kept in `%AppData%\Pulse\sessions.json`.
+
 ### Color that means something
 
 - **Temperatures change color** from cool teal to amber (72 °C and up) to red (85 °C and up), so you can spot thermal throttling at a glance.
@@ -125,7 +138,7 @@ To open the customize window at any time, **double-click the tray icon**, choose
 ### Show on overlay
 Switch **FPS**, **GPU**, **CPU** and **RAM** on or off to choose what the overlay shows, in both layouts. At least two must stay on, so the last two switches lock until you turn another one back on.
 
-Under **FPS**, **What limits your FPS** adds a *GPU-bound*, *CPU-bound* or *Capped* tag next to the frame rate.
+Under **FPS**, **What limits your FPS** adds a *GPU-bound*, *CPU-bound* or *Capped* tag next to the frame rate. The **Guide** button right below the switch opens a short guide to each tag, with tips for getting more FPS.
 
 ### Position on screen
 Top left · Top center · Top right · Bottom left · Bottom center · Bottom right.
@@ -146,6 +159,7 @@ The **FPS warnings** switch controls whether FPS turns amber below 60 and red be
 ### General
 - **Start with Windows**: launch Pulse at sign-in. When it starts this way, it goes straight to the overlay without opening the window.
 - **Show this window when Pulse starts**: turn this off to skip the customize window and show the overlay right away.
+- **Show a summary after each game**: the session summary when a game closes. Sessions are still recorded when it's off, so the tray can show the last one.
 
 ### Language
 Switch between **English** and **فارسی** at the top of the window. The change applies right away, including in the tray menu. The overlay itself always uses short universal labels (*fps*, *GPU*, *1% low*).
@@ -175,7 +189,7 @@ If another app already uses one of these shortcuts, Pulse tells you which one at
 |---|---|
 | **Click** the icon | Show / hide the overlay |
 | **Double-click** the icon | Open the customize window |
-| **Right-click** the icon | Menu: Customize…, Show / hide, Compact mode, Position, Exit |
+| **Right-click** the icon | Menu: Customize…, Show / hide, Compact mode, Position, Last game summary…, Exit |
 
 ### Quitting
 Right-click the tray icon and choose **Exit**, or click **Quit Pulse** in the customize window. Closing the customize window does **not** quit Pulse. It keeps running in the tray.
@@ -195,9 +209,9 @@ Go to **Settings → Apps → Installed apps → Pulse → Uninstall**. The unin
 - **1% low**: if this is much lower than your average FPS, you're feeling stutter even when the average looks fine.
 - **Frame time graph**: a flat line is smooth. Spikes are hitches.
 - **GPU-bound / CPU-bound / Capped** (optional): what holds your FPS back, judged from how long the GPU is busy on each frame.
-  - *GPU-bound*: the GPU is working flat out. Lower graphics settings or resolution to gain FPS.
-  - *CPU-bound*: the GPU is left waiting on the processor. Lowering graphics won't help much; lower CPU-heavy settings (crowds, view distance, simulation) instead.
-  - *Capped*: V-Sync or a frame limiter is holding FPS on purpose. Neither side is maxed out.
+  - *GPU-bound*: the GPU is working flat out. That's normal. For more FPS, turn on DLSS, FSR or XeSS, or lower the heaviest settings (ray tracing, shadows, volumetrics, anti-aliasing). Textures barely cost FPS while VRAM has room.
+  - *CPU-bound*: the GPU is left waiting on the processor. Lowering graphics won't help much. Instead, lower CPU-heavy settings (view distance, crowds, physics), close background apps, use the *Best performance* power mode, and turn on XMP/EXPO. Frame generation still makes the game look smoother.
+  - *Capped*: V-Sync or a frame limiter is holding FPS on purpose, and your PC has power to spare. To go higher, turn off V-Sync or raise the limit. With G-Sync/FreeSync, a limit a few FPS below the refresh rate is smoothest. If it's stuck at 30 or 60 on a laptop, check battery saver.
 - **Temperatures**: 🟢 below 72 °C comfortable · 🟡 72–84 °C working hard · 🔴 85 °C and above, likely to throttle.
 - **"Waiting for a game"**: Pulse is running but hasn't seen a game render yet.
 
@@ -279,6 +293,9 @@ GitHub Actions builds the installer and attaches it to a new Release. You can al
 | `App.xaml.cs` | Startup, tray icon, hotkeys and the UI update loop |
 | `Services/FpsService.cs` | Runs PresentMon and computes FPS, 1% low and frame times |
 | `Services/SensorService.cs` | Reads CPU / GPU / RAM sensors through LibreHardwareMonitor |
+| `Services/SessionTracker.cs` | Adds up each game session frame by frame, for the summary after each game |
+| `SessionSummaryWindow` / `SessionInsights.cs` | The game summary window, its verdict and tips |
+| `SessionHistory.cs` | The last 100 sessions, for "vs last time" and the tray |
 | `OverlayWindow` / `OverlayCard` | The click-through overlay and its compact / full layouts |
 | `SettingsWindow` | The customize window and live preview |
 | `StartupTask.cs` | "Start with Windows" through Task Scheduler |

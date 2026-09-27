@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Pulse"
+        xmlns:controls="clr-namespace:Pulse.Controls"
         Title="Pulse"
         Width="1280" Height="800" MinWidth="1040" MinHeight="700"
         WindowStartupLocation="CenterScreen"
@@ -31,6 +32,30 @@
             <Setter Property="CornerRadius" Value="14" />
             <Setter Property="Padding" Value="18,16" />
             <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <!-- a pill that stands out a little: opens a guide -->
+        <Style x:Key="InfoButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" CornerRadius="14" Background="{StaticResource AccentWash}" Padding="10,5,12,5">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Raised}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="Hint" TargetType="TextBlock">
@@ -140,11 +165,25 @@
                             <!-- FPS extras: nested under FPS, shown only while it's on -->
                             <Border x:Name="FpsExtras" Margin="24,0,0,6" Padding="6,0,0,0"
                                     BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
-                                <CheckBox x:Name="FpsBottleneck" Style="{StaticResource SubRowSwitch}" ToolTip="{local:T BottleneckTip}">
-                                    <TextBlock TextTrimming="CharacterEllipsis">
-                                        <Run Text="{local:T Bottleneck}" /><Run Text="   " /><Run Text="{local:T BottleneckHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
-                                    </TextBlock>
-                                </CheckBox>
+                                <StackPanel>
+                                    <CheckBox x:Name="FpsBottleneck" Style="{StaticResource SubRowSwitch}">
+                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                            <Run Text="{local:T Bottleneck}" /><Run Text="   " /><Run Text="{local:T BottleneckHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
+                                        </TextBlock>
+                                    </CheckBox>
+
+                                    <!-- opens the guide: what each tag means and what to do about it -->
+                                    <Button x:Name="BottleneckGuideButton" Style="{StaticResource InfoButton}" HorizontalAlignment="Left" Margin="6,2,6,6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                                <Ellipse Stroke="{StaticResource Accent}" StrokeThickness="1.4" />
+                                                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="11" Foreground="{StaticResource Accent}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
+                                            </Grid>
+                                            <TextBlock Text="{local:T BottleneckGuideOpen}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
                             </Border>
                             <Border Style="{StaticResource RowRule}" />
 
@@ -242,6 +281,7 @@
                         <TextBlock Text="{local:T General}" Style="{StaticResource SectionTitle}" />
                         <CheckBox x:Name="StartWithWindows" Style="{StaticResource Switch}" Content="{local:T StartWithWindows}" IsEnabled="False" />
                         <CheckBox x:Name="ShowOnLaunch" Style="{StaticResource Switch}" Content="{local:T ShowOnLaunch}" Margin="0,10,0,0" />
+                        <CheckBox x:Name="ShowSummary" Style="{StaticResource Switch}" Content="{local:T ShowSummary}" Margin="0,10,0,0" />
                         <CheckBox x:Name="AutoUpdate" Style="{StaticResource Switch}" Content="{local:T AutoUpdate}" Margin="0,10,0,0" />
 
                         <!-- version + manual check -->
@@ -250,6 +290,17 @@
                             <Button x:Name="CheckUpdates" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T CheckNow}" VerticalAlignment="Center" />
                             <TextBlock x:Name="UpdateStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- saved game summaries: open one, or delete it; the last summary is a click away too -->
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button x:Name="LastSummaryButton" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T LastSummary}" VerticalAlignment="Center" />
+                            <TextBlock Text="{local:T SavedTitle}" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <controls:SavedSummaryList x:Name="SavedList" />
                     </StackPanel>
                 </Border>
 

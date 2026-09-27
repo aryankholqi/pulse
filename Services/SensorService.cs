@@ -12,7 +12,8 @@ public sealed record HardwareSnapshot(
 
 /// <summary>
 /// Polls CPU / GPU / RAM once per second on its own low-priority thread.
-/// Only the three chosen devices are updated — never the whole machine.
+/// Only the three chosen devices are updated — never the whole machine. An NVIDIA card is read
+/// through <see cref="Nvml"/> instead: LibreHardwareMonitor's full update of it blocks ~85 ms.
 /// </summary>
 public sealed class SensorService : IDisposable
 {
@@ -29,6 +30,13 @@ public sealed class SensorService : IDisposable
     // not a hot spot. (LHM builds that read the real one through the PawnIO driver also expose
     // "GPU Hot Spot #1…"; that value is genuine and left alone.)
     bool _gpuHotspotEchoesCore;
+
+    // NVIDIA: temperature, load and VRAM from NVML every second. The hot spot only comes through
+    // LibreHardwareMonitor's full (slow) update, so that runs every HotspotEvery polls, and never on RTX 50.
+    const int HotspotEvery = 10;
+    Nvml? _nvml;
+    int _hotspotCountdown;
+    float? _nvHotspot;
 
     public HardwareSnapshot? Latest => Volatile.Read(ref _latest);
     public string? Error { get; private set; }
@@ -47,6 +55,7 @@ public sealed class SensorService : IDisposable
             _computer = new Computer { IsCpuEnabled = true, IsGpuEnabled = true, IsMemoryEnabled = true };
             _computer.Open();
             SelectHardware(_computer);
+            if (_gpu is { HardwareType: HardwareType.GpuNvidia }) _nvml = Nvml.Open(_gpu.Name);
         }
         catch (Exception ex)
         {
@@ -107,7 +116,7 @@ public sealed class SensorService : IDisposable
     HardwareSnapshot Poll()
     {
         _cpu?.Update();
-        _gpu?.Update();
+        if (_nvml is null) _gpu?.Update();
         foreach (var r in _ram) r.Update();
 
         float? cpuTemp = null, cpuLoad = null;
@@ -120,7 +129,14 @@ public sealed class SensorService : IDisposable
         }
 
         float? gpuTemp = null, gpuHotspot = null, gpuLoad = null, vramUsed = null, vramTotal = null;
-        if (_gpu != null)
+        if (_nvml != null)
+        {
+            gpuTemp = Plausible(_nvml.Temperature);
+            gpuLoad = _nvml.Load;
+            (vramUsed, vramTotal) = _nvml.Memory;
+            gpuHotspot = NvidiaHotspot();
+        }
+        else if (_gpu != null)
         {
             gpuTemp = Plausible(Find(_gpu, SensorType.Temperature, "GPU Core"));
             // AMD junction temp; NVIDIA through NVAPI up to RTX 40. Null (hidden) when not reported.
@@ -151,6 +167,18 @@ public sealed class SensorService : IDisposable
             ramUsed, ramUsed + ramAvail, ramLoad);
     }
 
+    /// <summary>The hot spot next to NVML's readings: refreshed every <see cref="HotspotEvery"/> polls. RTX 50 has none.</summary>
+    float? NvidiaHotspot()
+    {
+        if (_gpu is null || _gpuHotspotEchoesCore) return null;
+        if (--_hotspotCountdown > 0) return _nvHotspot;
+
+        _hotspotCountdown = HotspotEvery;
+        _gpu.Update();
+        _nvHotspot = Plausible(Find(_gpu, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "GPU Junction"));
+        return _nvHotspot;
+    }
+
     static float? Find(IHardware hw, SensorType type, params string[] names)
     {
         foreach (var name in names)
@@ -177,6 +205,7 @@ public sealed class SensorService : IDisposable
     {
         _cts.Cancel();
         _thread?.Join(1500);
+        _nvml?.Dispose();
         try { _computer?.Close(); } catch { }
         _cts.Dispose();
     }

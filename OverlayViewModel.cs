@@ -233,13 +233,13 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     static string Temp(float? t) => t is float v ? v.ToString("0", Inv) + "°" : Dash;
     static string Pct(float? p) => p is float v ? v.ToString("0", Inv) + "%" : Dash;
 
-    static string ShortGpu(string? name) => name is null ? "" :
+    internal static string ShortGpu(string? name) => name is null ? "" :
         name.Replace("NVIDIA ", "").Replace("GeForce ", "").Replace("AMD ", "").Trim();
 
     static readonly Regex CpuNoise = new(@"\((R|TM)\)|\d+(st|nd|rd|th) Gen\s*|\s\d+-Core.*$|\sProcessor.*$|\swith Radeon.*$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    static string ShortCpu(string? name) => name is null ? "" : CpuNoise.Replace(name, "").Trim();
+    internal static string ShortCpu(string? name) => name is null ? "" : CpuNoise.Replace(name, "").Trim();
 
     void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

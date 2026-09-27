@@ -14,6 +14,31 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
+        new(new Version(2, 6, 0), new[]
+        {
+            ("New: a summary after every game. Close a game and Pulse shows how it went: average FPS, 1% and 0.1% lows, " +
+             "stutters, FPS over the session, what limited it, temperatures, and tips for next time. " +
+             "It also compares with your last session of the same game.",
+             "جدید: خلاصه بعد از هر بازی. وقتی بازی را ببندی، Pulse نشان می‌دهد بازی چطور گذشت: میانگین FPS، 1% و 0.1% low، " +
+             "افت‌های ناگهانی، FPS در طول بازی، چه چیزی FPS را محدود کرد، دماها و پیشنهاد برای دفعه‌ی بعد. " +
+             "با دفعه‌ی قبلی که همان بازی را اجرا کردی هم مقایسه می‌کند."),
+            ("The summary also looks at your RAM: its speed, single or dual channel, and roughly how much FPS " +
+             "better RAM would have added in that game.",
+             "خلاصه رمت را هم بررسی می‌کند: سرعتش، تک‌کاناله یا دوکاناله بودنش، و اینکه رم بهتر تقریباً چقدر FPS " +
+             "به همان بازی اضافه می‌کرد."),
+            ("Save the summaries you want to keep and open them later from Saved summaries in the settings or the tray menu. " +
+             "Last game summary… in the tray reopens the latest one. Don't want it after every game? Turn it off in General.",
+             "خلاصه‌هایی را که می‌خواهی نگه داری ذخیره کن و بعداً از «خلاصه‌های ذخیره‌شده» در تنظیمات یا منوی سینی باز کن. " +
+             "«خلاصه‌ی آخرین بازی…» در منوی سینی آخرین خلاصه را دوباره باز می‌کند. اگر نمی‌خواهی بعد از هر بازی باز شود، در «عمومی» خاموشش کن."),
+            ("New: a short guide explains what GPU-bound, CPU-bound and Capped mean, and what you can do about each one " +
+             "to get more FPS. Open it with the Guide button under Show on overlay → FPS.",
+             "جدید: یک راهنمای کوتاه توضیح می‌دهد GPU-bound، CPU-bound و Capped یعنی چه و در هر حالت برای FPS بیشتر چه کار می‌توانی بکنی. " +
+             "آن را با دکمه‌ی «راهنما» در «آیتم‌های اورلی ← FPS» باز کن."),
+            ("With V-Sync on, Pulse now correctly shows Capped instead of GPU-bound.",
+             "وقتی V-Sync روشن است، Pulse حالا به‌درستی Capped نشان می‌دهد، نه GPU-bound."),
+            ("NVIDIA cards: Pulse now reads the GPU with far less work each second, which avoids small hitches it could cause in games.",
+             "کارت‌های انویدیا: Pulse حالا هر ثانیه با کار خیلی کمتری کارت گرافیک را می‌خواند، تا باعث افت‌های کوچک در بازی نشود."),
+        }),
         new(new Version(2, 5, 0), new[]
         {
             ("New: Pulse can show what limits your FPS: GPU-bound, CPU-bound or Capped (V-Sync or a frame limiter). " +

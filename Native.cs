@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -120,7 +121,96 @@ internal static class Native
         return job;
     }
 
+    // ── processes and windows (no handles opened on the game: anti-cheat friendly) ──
+
+    public static string GetWindowTitle(IntPtr hwnd)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        return GetWindowText(hwnd, sb, sb.Capacity) > 0 ? sb.ToString() : "";
+    }
+
+    /// <summary>Every running process ID, or null if Windows wouldn't say.</summary>
+    public static HashSet<int>? RunningProcessIds()
+    {
+        var ids = new uint[1024];
+        while (true)
+        {
+            if (!K32EnumProcesses(ids, (uint)(ids.Length * sizeof(uint)), out uint bytes)) return null;
+            int count = (int)(bytes / sizeof(uint));
+            if (count < ids.Length)
+            {
+                var set = new HashSet<int>(count);
+                for (int i = 0; i < count; i++) set.Add((int)ids[i]);
+                return set;
+            }
+            ids = new uint[ids.Length * 2]; // the buffer was full: there may be more
+        }
+    }
+
+    // ── display ──
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct MONITORINFOEX
+    {
+        public int cbSize;
+        public int rcMonitorL, rcMonitorT, rcMonitorR, rcMonitorB;
+        public int rcWorkL, rcWorkT, rcWorkR, rcWorkB;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public ushort dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+        public uint dmFields;
+        public int dmPositionX, dmPositionY;
+        public uint dmDisplayOrientation, dmDisplayFixedOutput;
+        public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public ushort dmLogPixels;
+        public uint dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+        public uint dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+    }
+
+    /// <summary>The monitor a window is on, for caching <see cref="RefreshRate"/>.</summary>
+    public static IntPtr MonitorOf(IntPtr hwnd) => MonitorFromWindow(hwnd, 2 /* MONITOR_DEFAULTTONEAREST */);
+
+    /// <summary>Refresh rate in Hz of that monitor's current mode, or 0 if Windows wouldn't say.</summary>
+    public static int RefreshRate(IntPtr monitor)
+    {
+        try
+        {
+            var mi = new MONITORINFOEX { cbSize = Marshal.SizeOf<MONITORINFOEX>() };
+            if (!GetMonitorInfo(monitor, ref mi)) return 0;
+            var dm = new DEVMODE { dmSize = (ushort)Marshal.SizeOf<DEVMODE>() };
+            if (!EnumDisplaySettings(mi.szDevice, -1 /* ENUM_CURRENT_SETTINGS */, ref dm)) return 0;
+            return dm.dmDisplayFrequency > 1 ? (int)dm.dmDisplayFrequency : 0; // 0 / 1: "hardware default"
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>The window fills its whole monitor (taskbar included): fullscreen or borderless, the way games run.</summary>
+    public static bool CoversMonitor(IntPtr hwnd)
+    {
+        try
+        {
+            if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r)) return false;
+            var mi = new MONITORINFOEX { cbSize = Marshal.SizeOf<MONITORINFOEX>() };
+            if (!GetMonitorInfo(MonitorOf(hwnd), ref mi)) return false;
+            return r.L <= mi.rcMonitorL && r.T <= mi.rcMonitorT && r.R >= mi.rcMonitorR && r.B >= mi.rcMonitorB;
+        }
+        catch { return false; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int L, T, R, B; }
+
     // ── P/Invoke ──
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFOEX info);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "EnumDisplaySettingsW")] static extern bool EnumDisplaySettings(string device, int mode, ref DEVMODE devMode);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
@@ -129,6 +219,7 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
 
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
@@ -138,4 +229,5 @@ internal static class Native
     [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr job, int infoClass, IntPtr info, uint length);
     [DllImport("kernel32.dll")] public static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
     [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll")] static extern bool K32EnumProcesses([Out] uint[] processIds, uint size, out uint bytesReturned);
 }

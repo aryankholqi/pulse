@@ -1,0 +1,147 @@
+<Window x:Class="Pulse.SessionSummaryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Pulse"
+        xmlns:controls="clr-namespace:Pulse.Controls"
+        Title="{local:T SumTitle}"
+        Width="640" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
+        Background="{StaticResource Bg}"
+        FontFamily="Segoe UI" FontSize="13"
+        Foreground="{StaticResource Text}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        FlowDirection="{Binding FlowDirection, Source={x:Static local:Loc.Instance}}">
+
+    <!--
+      After a game: one verdict, the four numbers that matter (with how they moved since last
+      time), FPS across the session, what limited it, how hot things ran, and what to try next.
+    -->
+    <Window.Resources>
+        <Style x:Key="Box" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="16,12,16,14" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+        </Style>
+        <Style x:Key="BoxTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="24,22,24,20">
+
+        <!-- header: pulse mark, game, when and how long · verdict -->
+        <DockPanel>
+            <Border x:Name="VerdictPill" DockPanel.Dock="Right" VerticalAlignment="Center" CornerRadius="13" Padding="10,4,12,5"
+                    BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="VerdictDot" Width="7" Height="7" VerticalAlignment="Center" />
+                    <TextBlock x:Name="VerdictText" FontWeight="SemiBold" FontSize="12.5" Margin="7,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#2A314E" Offset="0" />
+                            <GradientStop Color="#131727" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Path Data="M5,21 L12,21 L15,14 L20,28 L24,9 L27,21 L35,21" Stroke="{StaticResource Accent}" StrokeThickness="2.6"
+                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" FlowDirection="LeftToRight" />
+                </Border>
+                <StackPanel Margin="14,0,16,0" VerticalAlignment="Center" MaxWidth="400">
+                    <TextBlock x:Name="GameTitle" FontSize="18" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="Subtitle" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </StackPanel>
+        </DockPanel>
+
+        <ScrollViewer Margin="0,12,0,0" MaxHeight="600" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
+            </ScrollViewer.Resources>
+            <StackPanel>
+
+                <!-- the numbers, and how they moved since the last session of this game -->
+                <TextBlock x:Name="Comparison" Foreground="{StaticResource Muted}" FontSize="11.5" Margin="2,0,0,0" TextTrimming="CharacterEllipsis" />
+                <UniformGrid x:Name="Tiles" Columns="4" Rows="1" Margin="-4,8,-4,0" />
+
+                <!-- FPS over the session -->
+                <Border Style="{StaticResource Box}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{local:T SumTimelineHint}" Foreground="{StaticResource Faint}" FontSize="11" />
+                            <TextBlock Text="{local:T SumTimeline}" Style="{StaticResource BoxTitle}" />
+                        </DockPanel>
+                        <controls:FpsTimeline x:Name="Timeline" Height="128" Margin="0,10,0,0"
+                                              Grid="{StaticResource Line}" Label="{StaticResource Muted}" Surface="{StaticResource Surface}"
+                                              Tip="{StaticResource Raised}" TipText="{StaticResource Text}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- what limited it -->
+                <Border x:Name="BoundBox" Style="{StaticResource Box}">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button x:Name="GuideLink" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T SumBoundGuide}"
+                                    Foreground="{StaticResource Accent}" />
+                            <TextBlock Text="{local:T SumBound}" Style="{StaticResource BoxTitle}" />
+                        </DockPanel>
+                        <controls:SplitBar x:Name="BoundBar" Height="12" Margin="0,12,0,0" />
+                        <WrapPanel x:Name="BoundLegend" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- hardware -->
+                <Border x:Name="HardwareBox" Style="{StaticResource Box}">
+                    <StackPanel>
+                        <TextBlock Text="{local:T SumHardware}" Style="{StaticResource BoxTitle}" />
+                        <UniformGrid x:Name="HardwareGrid" Columns="2" Margin="0,8,0,0" />
+                        <TextBlock x:Name="NoSensors" Text="{local:T SumNoSensors}" Foreground="{StaticResource Muted}" FontSize="12"
+                                   TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- RAM: how full it got, what's installed, and what better RAM would have added -->
+                <Border x:Name="RamBox" Style="{StaticResource Box}">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock x:Name="RamKit" DockPanel.Dock="Right" Foreground="{StaticResource Muted}" FontSize="11.5"
+                                       FlowDirection="LeftToRight" />
+                            <TextBlock Text="{local:T SumRam}" Style="{StaticResource BoxTitle}" />
+                        </DockPanel>
+                        <StackPanel x:Name="RamRows" Margin="0,5,0,0" />
+                        <StackPanel x:Name="RamUpgradeBox" Margin="0,12,0,0">
+                            <TextBlock Text="{local:T SumRamUpgrade}" Style="{StaticResource BoxTitle}" />
+                            <StackPanel x:Name="RamUpgrades" Margin="0,3,0,0" />
+                            <TextBlock x:Name="RamBasis" Foreground="{StaticResource Faint}" FontSize="11.5" TextWrapping="Wrap"
+                                       LineHeight="18" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- what to try next -->
+                <Border Style="{StaticResource Box}">
+                    <StackPanel>
+                        <TextBlock Text="{local:T SumTips}" Style="{StaticResource BoxTitle}" />
+                        <StackPanel x:Name="TipList" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <DockPanel Margin="0,18,0,0">
+            <Button x:Name="OkButton" DockPanel.Dock="Right" Style="{StaticResource Primary}" Content="{local:T WhatsNewOk}"
+                    IsDefault="True" IsCancel="True" />
+            <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource Ghost}" Margin="0,0,10,0" />
+            <CheckBox x:Name="ShowAfterGames" Style="{StaticResource Switch}" Content="{local:T SumShowAfter}" VerticalAlignment="Center" />
+        </DockPanel>
+    </StackPanel>
+</Window>
