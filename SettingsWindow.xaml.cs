@@ -286,6 +286,9 @@ public partial class SettingsWindow : Window
         catch { /* no browser / blocked: nothing useful to do */ }
     }
 
+    /// <summary>The benchmark length choices (0: until the hotkey is pressed again).</summary>
+    (RadioButton Button, int Seconds)[] BenchLengths => [(Bench30, 30), (Bench60, 60), (Bench120, 120), (BenchOpen, 0)];
+
     void LoadValues()
     {
         (_settings.Language == AppLanguage.Persian ? LangFa : LangEn).IsChecked = true;
@@ -293,6 +296,7 @@ public partial class SettingsWindow : Window
 
         ShowOnLaunch.IsChecked = _settings.ShowSettingsOnLaunch;
         ShowSummary.IsChecked = _settings.ShowSessionSummary;
+        foreach (var (button, seconds) in BenchLengths) button.IsChecked = _settings.BenchmarkSeconds == seconds;
         AutoUpdate.IsChecked = _settings.CheckForUpdates;
         RefreshUpdateCard();
         HudToggle.IsChecked = _settings.PreviewHud;
@@ -389,6 +393,8 @@ public partial class SettingsWindow : Window
 
         OnSwitch(ShowOnLaunch, on => { _settings.ShowSettingsOnLaunch = on; Save(); });
         OnSwitch(ShowSummary, on => { _settings.ShowSessionSummary = on; Save(); });
+        foreach (var (button, seconds) in BenchLengths)
+            button.Checked += (_, _) => { _settings.BenchmarkSeconds = seconds; Save(); };
         OnSwitch(AutoUpdate, on => { _settings.CheckForUpdates = on; Save(); RefreshUpdateCard(); });
         UpdateAction.Click += async (_, _) =>
         {

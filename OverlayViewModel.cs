@@ -94,6 +94,23 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     public Brush BottleneckBrush { get => _bottleneckBrush; private set => Set(ref _bottleneckBrush, value); }
     public Visibility BottleneckVisibility { get => _bottleneckVisibility; private set => Set(ref _bottleneckVisibility, value); }
 
+    // benchmark: "● BENCH 0:42" while it records, then its result for a few seconds; collapsed otherwise
+    string _benchText = "";
+    Brush _benchBrush = Palette.Hot;
+    Visibility _benchVisibility = Visibility.Collapsed;
+
+    public string BenchText { get => _benchText; private set => Set(ref _benchText, value); }
+    public Brush BenchBrush { get => _benchBrush; private set => Set(ref _benchBrush, value); }
+    public Visibility BenchVisibility { get => _benchVisibility; private set => Set(ref _benchVisibility, value); }
+
+    /// <summary>Null hides the badge; <paramref name="recording"/> shows it red, a finished run's result shows it calm.</summary>
+    public void SetBenchmark(string? text, bool recording)
+    {
+        BenchText = text ?? "";
+        BenchBrush = recording ? Palette.Hot : Palette.Cool;
+        BenchVisibility = text is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     public void ApplyStyle(OverlayStyle settings)
     {
         _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(settings.FpsColor, AppSettings.DefaultFpsColor));

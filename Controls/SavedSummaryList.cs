@@ -115,14 +115,22 @@ public sealed class SavedSummaryList : UniformGrid
 
         var title = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         title.Children.Add(new TextBlock { Text = s.Game, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
-        title.Children.Add(new TextBlock
+        var when = new TextBlock
         {
-            Text = $"{SessionSummaryWindow.When(s.Ended)}  ·  {SessionSummaryWindow.Duration(s.PlaySeconds)}",
             Foreground = muted,
             FontSize = 11.5,
             Margin = new Thickness(0, 2, 0, 0),
             TextTrimming = TextTrimming.CharacterEllipsis,
-        });
+        };
+        if (s.Benchmark)
+        {
+            // "Benchmark · DLSS Quality · Today, 21:40 · 60 s": runs stand out from sessions, named as the player named them
+            when.Inlines.Add(new System.Windows.Documents.Run(Loc.T("BenchTag")) { Foreground = (Brush)FindResource("Accent"), FontWeight = FontWeights.SemiBold });
+            if (s.Label is { Length: > 0 } label) when.Inlines.Add(new System.Windows.Documents.Run("  ·  " + label) { Foreground = (Brush)FindResource("Soft") });
+            when.Inlines.Add($"  ·  {SessionSummaryWindow.When(s.Ended)}  ·  {SessionSummaryWindow.RunLength(s.PlaySeconds)}");
+        }
+        else when.Text = $"{SessionSummaryWindow.When(s.Ended)}  ·  {SessionSummaryWindow.Duration(s.PlaySeconds)}";
+        title.Children.Add(when);
 
         var header = new DockPanel();
         header.Children.Add(pill);

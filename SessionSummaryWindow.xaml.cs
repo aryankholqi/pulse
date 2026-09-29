@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
@@ -11,14 +12,18 @@ using Pulse.Services;
 
 namespace Pulse;
 
-/// <summary>Shown when a game closes (or from the tray): how the session went and what to try next.</summary>
+/// <summary>
+/// Shown when a game closes (or from the tray): how the session went and what to try next.
+/// A benchmark run shows the same, named by the player and compared with any other run of the game.
+/// </summary>
 public partial class SessionSummaryWindow : Window
 {
     static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     const string Dash = "–";
 
-    readonly GameSession _session;
-    readonly GameSession? _previous;
+    GameSession _session;
+    GameSession? _previous;
+    readonly List<GameSession> _otherRuns;   // a benchmark: the game's other runs, newest first
     readonly AppSettings _settings;
     readonly Brush _gpuHue, _cpuHue;
 
@@ -29,6 +34,7 @@ public partial class SessionSummaryWindow : Window
     {
         _session = session;
         _previous = previous;
+        _otherRuns = session.Benchmark ? SessionHistory.OtherRuns(session) : new();
         _settings = settings;
         _gpuHue = ColorUtil.Solid(ColorUtil.Parse(settings.GpuColor, AppSettings.DefaultGpuColor));
         _cpuHue = ColorUtil.Solid(ColorUtil.Parse(settings.CpuColor, AppSettings.DefaultCpuColor));
@@ -48,6 +54,26 @@ public partial class SessionSummaryWindow : Window
         OkButton.Click += (_, _) => Close();
         SaveButton.Click += (_, _) => SessionHistory.SetSaved(_session, !SessionHistory.IsSaved(_session));
 
+        if (session.Benchmark)
+        {
+            Title = Loc.T("BenchTitle");
+            ShowAfterGames.Visibility = Visibility.Collapsed; // runs always get their result
+            RunNameRow.Visibility = Visibility.Visible;
+            RunName.Text = session.Label ?? "";
+            RunNameHint.Visibility = RunName.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            RunName.TextChanged += (_, _) =>
+                RunNameHint.Visibility = RunName.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            RunName.LostKeyboardFocus += (_, _) => SaveRunName();
+            RunName.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key != System.Windows.Input.Key.Enter) return;
+                SaveRunName();
+                e.Handled = true; // Enter names the run; it doesn't close the window
+            };
+            CompareOlder.Click += (_, _) => StepCompare(+1);
+            CompareNewer.Click += (_, _) => StepCompare(-1);
+        }
+
         Build();
 
         // plain text, not bindings: rebuild when the language switches
@@ -57,6 +83,7 @@ public partial class SessionSummaryWindow : Window
         SessionHistory.Changed += saved;
         Closed += (_, _) =>
         {
+            if (_session.Benchmark) SaveRunName(); // closed straight from typing
             Loc.Instance.PropertyChanged -= relabel;
             SessionHistory.Changed -= saved;
         };
@@ -90,7 +117,9 @@ public partial class SessionSummaryWindow : Window
         // ── header ──
         GameTitle.Text = s.Game;
         GameTitle.ToolTip = s.Process + ".exe";
-        Subtitle.Text = $"{Duration(s.PlaySeconds)}  ·  {When(s.Ended)}";
+        Subtitle.Text = s.Benchmark
+            ? $"{Loc.T("BenchTag")}  ·  {RunLength(s.PlaySeconds)}  ·  {When(s.Ended)}"
+            : $"{Duration(s.PlaySeconds)}  ·  {When(s.Ended)}";
 
         var (verdictKey, verdictBrush) = SessionInsights.Judge(s) switch
         {
@@ -106,9 +135,19 @@ public partial class SessionSummaryWindow : Window
 
         // ── numbers ──
         var p = _previous;
-        Comparison.Text = p is null
-            ? Loc.T("SumFirst")
-            : string.Format(Loc.T("SumVsLast"), $"{When(p.Ended)}, {Duration(p.PlaySeconds)}");
+        if (s.Benchmark)
+        {
+            Comparison.Text = p is null ? Loc.T("BenchFirst") : string.Format(Loc.T("BenchVs"), DescribeRun(p));
+            Comparison.ToolTip = Comparison.Text;
+            int at = p is null ? -1 : _otherRuns.FindIndex(r => r.Started == p.Started);
+            CompareSteps.Visibility = _otherRuns.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            Step(CompareOlder, at + 1 < _otherRuns.Count);
+            Step(CompareNewer, at > 0);
+        }
+        else
+            Comparison.Text = p is null
+                ? Loc.T("SumFirst")
+                : string.Format(Loc.T("SumVsLast"), $"{When(p.Ended)}, {Duration(p.PlaySeconds)}");
 
         Tiles.Children.Clear();
         Tiles.Children.Add(Tile(Loc.T("SumAvg"), Fps(s.AvgFps), null, Delta(s.AvgFps, p?.AvgFps, higherIsBetter: true)));
@@ -181,6 +220,44 @@ public partial class SessionSummaryWindow : Window
             row.Children.Add(new TextBlock { Text = tip, Foreground = textSoft, TextWrapping = TextWrapping.Wrap, LineHeight = 20 });
             TipList.Children.Add(row);
         }
+    }
+
+    // ───────────────────────── benchmark ─────────────────────────
+
+    void SaveRunName()
+    {
+        _session = SessionHistory.SetLabel(_session, RunName.Text); // the saved summaries follow (Changed)
+    }
+
+    /// <summary>Compare with the next older (+1) or newer (-1) run of the game.</summary>
+    void StepCompare(int by)
+    {
+        int at = _previous is { } p ? _otherRuns.FindIndex(r => r.Started == p.Started) : -1;
+        int next = at + by;
+        if (next < 0 || next >= _otherRuns.Count) return;
+        _previous = _otherRuns[next];
+        Build();
+    }
+
+    static void Step(Button button, bool enabled)
+    {
+        button.IsEnabled = enabled;
+        button.Opacity = enabled ? 1 : 0.35;
+    }
+
+    /// <summary>A run as the player knows it: its name, else when it was, and its length.</summary>
+    internal static string DescribeRun(GameSession run) =>
+        run.Label is { Length: > 0 } label
+            ? $"{label} ({When(run.Ended)})"
+            : $"{When(run.Ended)}, {RunLength(run.PlaySeconds)}";
+
+    /// <summary>A benchmark's length to the second: "45 s", "2 min 30 s".</summary>
+    internal static string RunLength(double seconds)
+    {
+        int total = (int)Math.Round(seconds);
+        return total < 60 ? string.Format(Loc.T("BenchSeconds"), total)
+             : total % 60 == 0 ? string.Format(Loc.T("SumMinutes"), total / 60)
+             : string.Format(Loc.T("BenchMinSec"), total / 60, total % 60);
     }
 
     /// <summary>"Save" or "✓ Saved" (a click on that one unsaves).</summary>

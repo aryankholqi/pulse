@@ -18,6 +18,12 @@ public sealed record GameSession
     /// <summary>The player kept this summary: it stays in the history until they delete it.</summary>
     public bool Saved { get; init; }
 
+    /// <summary>A benchmark run (Ctrl+Shift+B): a stretch of play the player timed, not a whole session.</summary>
+    public bool Benchmark { get; init; }
+
+    /// <summary>The player's name for a benchmark run ("DLSS Quality"), so runs can be told apart.</summary>
+    public string? Label { get; init; }
+
     /// <summary>Time the game was in front and drawing: alt-tabbed and paused time left out.</summary>
     public double PlaySeconds { get; init; }
     public long Frames { get; init; }
@@ -66,6 +72,8 @@ public sealed class SessionTracker
     /// </summary>
     public const double MinFullscreenPlaySeconds = 10;
     public const double MinPlaySeconds = 120;
+    /// <summary>A benchmark stopped sooner than this has too few frames to say anything.</summary>
+    public const double MinBenchmarkSeconds = 5;
     const int MaxLive = 8;
     const double PlayingSeconds = 2;   // "is it drawing right now?" look-back
 
@@ -96,6 +104,10 @@ public sealed class SessionTracker
     IntPtr _foregroundWindow;                    // UI thread only
     volatile int _refreshHz;
 
+    // A benchmark: a second recorder on one game, fed alongside its session. Guarded by _gate.
+    SessionRecorder? _bench;
+    int _benchPid;
+
     /// <summary>Refresh rate of the game's monitor (0 = unknown), set from the UI tick; tells V-Sync apart.</summary>
     internal int RefreshHz { set => _refreshHz = value; }
 
@@ -104,10 +116,18 @@ public sealed class SessionTracker
     {
         lock (_gate)
         {
-            if (!_live.TryGetValue(pid, out var rec)) return;
             // only what the player sees: frames drawn while the game is in front
-            if (pid == _foreground) rec.Add(ms, gpuBusyMs, cpuWaitMs, _refreshHz);
-            else rec.Gap();
+            bool front = pid == _foreground;
+            if (_live.TryGetValue(pid, out var rec))
+            {
+                if (front) rec.Add(ms, gpuBusyMs, cpuWaitMs, _refreshHz);
+                else rec.Gap();
+            }
+            if (_bench != null && pid == _benchPid)
+            {
+                if (front) _bench.Add(ms, gpuBusyMs, cpuWaitMs, _refreshHz);
+                else _bench.Gap();
+            }
         }
     }
 
@@ -177,7 +197,59 @@ public sealed class SessionTracker
         {
             if (_live.TryGetValue(_foreground, out var rec) && rec.IsPlaying(PlayingSeconds))
                 rec.Sample(hw);
+            if (_bench != null && _benchPid == _foreground && _bench.IsPlaying(PlayingSeconds))
+                _bench.Sample(hw);
         }
+    }
+
+    // ───────────────────────── benchmark ─────────────────────────
+
+    /// <summary>
+    /// UI thread: start a benchmark on the game in front. False when there's no game in front
+    /// drawing frames, or a benchmark is already running.
+    /// </summary>
+    public bool StartBenchmark()
+    {
+        lock (_gate)
+        {
+            if (_bench != null) return false;
+            if (!_live.TryGetValue(_foreground, out var game) || !game.IsPlaying(PlayingSeconds)) return false;
+
+            _bench = new SessionRecorder(game.Process, game.Game, benchmark: true)
+            {
+                Window = game.Window,
+                Fullscreen = game.Fullscreen,
+                ExePath = game.ExePath,
+            };
+            _benchPid = _foreground;
+            return true;
+        }
+    }
+
+    public bool BenchmarkRunning
+    {
+        get { lock (_gate) return _bench != null; }
+    }
+
+    /// <summary>Play time the running benchmark has recorded: time away from the game doesn't count.</summary>
+    public double BenchmarkSeconds
+    {
+        get { lock (_gate) return _bench is null ? 0 : _bench.PlayMs / 1000; }
+    }
+
+    /// <summary>UI thread: end the benchmark. Null when none was running or it was too short to judge.</summary>
+    public GameSession? StopBenchmark()
+    {
+        lock (_gate) return FinishBenchmark();
+    }
+
+    // Caller holds _gate.
+    GameSession? FinishBenchmark()
+    {
+        var bench = _bench;
+        _bench = null;
+        _benchPid = 0;
+        return bench?.Finish();
     }
 
     /// <summary>
@@ -197,13 +269,25 @@ public sealed class SessionTracker
         }
     }
 
+    /// <summary>
+    /// UI thread: a game is in front and drawing, windowed or not. A benchmark's result waits for the
+    /// player to leave even a windowed game: they started the run from inside it, so they're playing.
+    /// </summary>
+    public bool PlayingInFront
+    {
+        get
+        {
+            lock (_gate) return _live.TryGetValue(_foreground, out var rec) && rec.IsPlaying(PlayingSeconds);
+        }
+    }
+
     /// <summary>Sessions whose game has exited, long enough to be worth a summary. Oldest first.</summary>
     public List<GameSession> TakeEnded()
     {
         var ended = new List<GameSession>();
         lock (_gate)
         {
-            if (_live.Count == 0 && _ignored.Count == 0) return ended;
+            if (_live.Count == 0 && _ignored.Count == 0 && _bench is null) return ended;
 
             var running = Native.RunningProcessIds();
             if (running is null) return ended; // couldn't tell: ask again next time
@@ -212,10 +296,13 @@ public sealed class SessionTracker
             // an app ignored earlier, and must not be ignored along with it.
             _ignored.RemoveWhere(pid => !running.Contains(pid));
 
+            // the game closed mid-benchmark: the run ends with it, with whatever it recorded
+            if (_bench != null && !running.Contains(_benchPid) && FinishBenchmark() is { } run) ended.Add(run);
+
             List<int>? gone = null;
             foreach (var pid in _live.Keys)
                 if (!running.Contains(pid)) (gone ??= new()).Add(pid);
-            if (gone is null) return ended;
+            if (gone is null) return ended; // (a benchmark that just ended is in it)
 
             foreach (var pid in gone)
             {
@@ -232,6 +319,7 @@ public sealed class SessionTracker
         var ended = new List<GameSession>();
         lock (_gate)
         {
+            if (FinishBenchmark() is { } run) ended.Add(run);
             foreach (var rec in _live.Values)
                 if (rec.Finish() is { } session) ended.Add(session);
             _live.Clear();
@@ -270,6 +358,7 @@ internal sealed class SessionRecorder
     static readonly double Scale = Buckets / (Math.Log(MaxMs) - LogMin);
 
     const double TimelineBucketMs = 5000;
+    const double BenchTimelineBucketMs = 1000; // a run lasts a minute or two: every second is worth a point
     const int TimelinePoints = 240;
     const double BoundChunkMs = 2000;   // same window the overlay judges over
     const int BoundMinFrames = 10;
@@ -311,11 +400,18 @@ internal sealed class SessionRecorder
     int _ramN;
     float? _ramPeak, _ramTotal;
 
-    public SessionRecorder(string process, string game)
+    readonly bool _benchmark;
+    readonly double _timelineBucketMs;
+
+    public SessionRecorder(string process, string game, bool benchmark = false)
     {
         _process = process;
         Game = game;
+        _benchmark = benchmark;
+        _timelineBucketMs = benchmark ? BenchTimelineBucketMs : TimelineBucketMs;
     }
+
+    public string Process => _process;
 
     /// <summary>The name shown in the summary: the title of the game's latest window. Set on the UI thread.</summary>
     public volatile string Game;
@@ -377,10 +473,10 @@ internal sealed class SessionRecorder
             _chunkMs = 0;
         }
 
-        // timeline: average FPS per 5 s of play
+        // timeline: average FPS per 5 s of play (1 s in a benchmark)
         _bucketMs += ms;
         _bucketFrames++;
-        if (_bucketMs >= TimelineBucketMs)
+        if (_bucketMs >= _timelineBucketMs)
         {
             _timeline.Add((float)(_bucketFrames * 1000.0 / _bucketMs));
             _bucketMs = 0;
@@ -405,7 +501,9 @@ internal sealed class SessionRecorder
     /// <summary>The summary, or null when the game wasn't played long enough.</summary>
     public GameSession? Finish()
     {
-        double minSeconds = Fullscreen ? SessionTracker.MinFullscreenPlaySeconds : SessionTracker.MinPlaySeconds;
+        // a benchmark was started by hand on a game: only too few frames rule it out
+        double minSeconds = _benchmark ? SessionTracker.MinBenchmarkSeconds
+                          : Fullscreen ? SessionTracker.MinFullscreenPlaySeconds : SessionTracker.MinPlaySeconds;
         if (_playMs < minSeconds * 1000 || _frames < 100) return null;
 
         double judged = _gpuMs + _cpuMs + _cappedMs;
@@ -413,7 +511,7 @@ internal sealed class SessionRecorder
 
         // timeline: keep the partial last bucket if it's meaningful, then fit into TimelinePoints
         var points = new List<float>(_timeline);
-        if (_bucketMs >= TimelineBucketMs / 2) points.Add((float)(_bucketFrames * 1000.0 / _bucketMs));
+        if (_bucketMs >= _timelineBucketMs / 2) points.Add((float)(_bucketFrames * 1000.0 / _bucketMs));
         int merge = Math.Max(1, (int)Math.Ceiling(points.Count / (double)TimelinePoints));
         var timeline = new float[(points.Count + merge - 1) / merge];
         for (int i = 0; i < timeline.Length; i++)
@@ -431,6 +529,8 @@ internal sealed class SessionRecorder
             ExePath = ExePath,
             Started = _started,
             Ended = DateTime.Now,
+            Benchmark = _benchmark,
+            Saved = _benchmark, // runs are made to be compared later: kept until the player deletes them
             PlaySeconds = _playMs / 1000,
             Frames = _frames,
             AvgFps = _frames * 1000.0 / _playMs,
@@ -455,7 +555,7 @@ internal sealed class SessionRecorder
             RamTotalGb = _ramTotal,
             RamModules = MemoryModules.Current,
             Timeline = timeline,
-            TimelineSeconds = TimelineBucketMs / 1000 * merge,
+            TimelineSeconds = _timelineBucketMs / 1000 * merge,
         };
     }
 

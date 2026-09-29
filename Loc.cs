@@ -138,6 +138,7 @@ public sealed class Loc : INotifyPropertyChanged
         ["HotkeyToggle"] = ("Show or hide the overlay", "نمایش یا پنهان کردن اورلی"),
         ["HotkeyCompact"] = ("Switch between compact and full", "جابه‌جایی بین حالت فشرده و کامل"),
         ["HotkeyMove"] = ("Move it to the next spot", "بردن اورلی به جای بعدی"),
+        ["HotkeyBench"] = ("Start or stop a benchmark", "شروع یا توقف بنچمارک"),
         ["HotkeysProfileHint"] = ("In a game with its own profile, these change that game's look.",
                                   "در بازی‌ای که پروفایل خودش را دارد، این کلیدها ظاهر همان بازی را تغییر می‌دهند."),
 
@@ -262,6 +263,38 @@ public sealed class Loc : INotifyPropertyChanged
         ["LastSummary"] = ("Last game summary", "خلاصه‌ی آخرین بازی"),
         ["TraySaved"] = ("Saved summaries…", "خلاصه‌های ذخیره‌شده…"),
         ["SumShowAfter"] = ("Show after every game", "بعد از هر بازی نشان بده"),
+
+        // ── benchmark (Ctrl+Shift+B) ──
+        ["BenchSection"] = ("Benchmark", "بنچمارک"),
+        ["BenchSectionHint"] = ("Press Ctrl+Shift+B in a game to record a run, then change a setting and run the same spot again. " +
+                                "Each result is saved and compared with your other runs of that game.",
+                                "داخل بازی Ctrl+Shift+B را بزن تا یک اجرا ثبت شود، بعد یک تنظیم را عوض کن و همان صحنه را دوباره اجرا کن. " +
+                                "هر نتیجه ذخیره می‌شود و با بقیه‌ی اجراهای همان بازی مقایسه می‌شود."),
+        ["BenchLength"] = ("Length", "مدت"),
+        ["Bench30"] = ("30 s", "۳۰ ثانیه"),
+        ["Bench60"] = ("60 s", "۶۰ ثانیه"),
+        ["Bench120"] = ("2 min", "۲ دقیقه"),
+        ["BenchOpen"] = ("Until I stop it", "تا خودم متوقفش کنم"),
+        ["BenchLengthHint"] = ("Only time in the game counts: alt-tabbed and paused time is left out. Press the hotkey again to stop early.",
+                               "فقط زمانی که داخل بازی هستی حساب می‌شود؛ زمان alt-tab و مکث حساب نمی‌شود. برای توقف زودتر، دوباره همان کلید را بزن."),
+        ["BenchNoGame"] = ("No game is running in front. Click into your game, then press Ctrl+Shift+B.",
+                           "هیچ بازی‌ای جلوی صفحه در حال اجرا نیست. روی بازی کلیک کن و بعد Ctrl+Shift+B را بزن."),
+        ["BenchStarted"] = ("Benchmark started: {0} seconds of play.", "بنچمارک شروع شد: {0} ثانیه بازی."),
+        ["BenchStartedOpen"] = ("Benchmark started. Press Ctrl+Shift+B again to stop.", "بنچمارک شروع شد. برای توقف دوباره Ctrl+Shift+B را بزن."),
+        ["BenchTooShort"] = ("Benchmark stopped too soon to measure. Let it run at least 5 seconds.",
+                             "بنچمارک خیلی زود متوقف شد و قابل اندازه‌گیری نیست. حداقل ۵ ثانیه اجرا کن."),
+        ["BenchDone"] = ("Benchmark done: {0} FPS average, {1} 1% low.", "بنچمارک تمام شد: میانگین {0} FPS، و 1% low برابر {1}."),
+        ["BenchDoneClick"] = ("Click for the full result.", "برای دیدن نتیجه‌ی کامل کلیک کن."),
+        ["BenchTitle"] = ("Benchmark result", "نتیجه‌ی بنچمارک"),
+        ["BenchTag"] = ("Benchmark", "بنچمارک"),
+        ["BenchNameHint"] = ("Name this run, e.g. DLSS Quality, Ultra textures", "برای این اجرا اسم بگذار، مثلاً DLSS Quality یا تکسچر Ultra"),
+        ["BenchFirst"] = ("First benchmark of this game. Change a setting and run it again to compare.",
+                          "اولین بنچمارک این بازی است. یک تنظیم را عوض کن و دوباره اجرا کن تا مقایسه شود."),
+        ["BenchVs"] = ("Compared with {0}", "در مقایسه با {0}"),
+        ["BenchOlder"] = ("‹ Older run", "اجرای قبلی"),
+        ["BenchNewer"] = ("Newer run ›", "اجرای بعدی"),
+        ["BenchSeconds"] = ("{0} s", "{0} ثانیه"),
+        ["BenchMinSec"] = ("{0} min {1} s", "{0} دقیقه و {1} ثانیه"),
 
         ["HotkeysTaken"] = ("These hotkeys are taken by another app: ", "این کلیدها را برنامه‌ی دیگری گرفته: "),
     };

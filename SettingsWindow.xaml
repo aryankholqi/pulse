@@ -778,6 +778,26 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- benchmark: how long a run records -->
+                            <Border Style="{StaticResource Panel}">
+                                <StackPanel>
+                                    <TextBlock Text="{local:T BenchSection}" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock Text="{local:T BenchSectionHint}" Foreground="{StaticResource Soft}" TextWrapping="Wrap" LineHeight="19" />
+                                    <DockPanel Margin="0,14,0,0">
+                                        <TextBlock Text="{local:T BenchLength}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                        <Border Style="{StaticResource Segmented}" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal">
+                                                <RadioButton x:Name="Bench30" Style="{StaticResource Segment}" GroupName="bench" Content="{local:T Bench30}" Padding="12,5" />
+                                                <RadioButton x:Name="Bench60" Style="{StaticResource Segment}" GroupName="bench" Content="{local:T Bench60}" Padding="12,5" />
+                                                <RadioButton x:Name="Bench120" Style="{StaticResource Segment}" GroupName="bench" Content="{local:T Bench120}" Padding="12,5" />
+                                                <RadioButton x:Name="BenchOpen" Style="{StaticResource Segment}" GroupName="bench" Content="{local:T BenchOpen}" Padding="12,5" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DockPanel>
+                                    <TextBlock Text="{local:T BenchLengthHint}" Style="{StaticResource Hint}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
                             <Border Style="{StaticResource Panel}">
                                 <StackPanel>
                                     <TextBlock Text="{local:T HotkeysTitle}" Style="{StaticResource SectionTitle}" />
@@ -792,6 +812,10 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + Shift + P" FontFamily="Bahnschrift, Segoe UI" /></Border>
                                         <TextBlock Text="{local:T HotkeyMove}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + Shift + B" FontFamily="Bahnschrift, Segoe UI" /></Border>
+                                        <TextBlock Text="{local:T HotkeyBench}" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + B" FontFamily="Bahnschrift, Segoe UI" /></Border>

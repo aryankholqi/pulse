@@ -10,6 +10,7 @@ namespace Pulse;
 /// The latest game sessions, kept in %AppData%\Pulse\sessions.json: the tray reopens the last
 /// summary from it, and each summary compares itself with the previous session of the same game.
 /// Saved sessions are kept on top of the latest <see cref="Keep"/>, until the player deletes them.
+/// Benchmark runs are saved from the start, and compare only with other runs of the same game.
 /// </summary>
 internal static class SessionHistory
 {
@@ -42,6 +43,18 @@ internal static class SessionHistory
         Save();
         Changed?.Invoke();
         return updated;
+    }
+
+    /// <summary>Names a benchmark run ("DLSS Quality"); blank clears it. Returns the stored copy.</summary>
+    public static GameSession SetLabel(GameSession session, string? label)
+    {
+        label = string.IsNullOrWhiteSpace(label) ? null : label.Trim();
+        int i = IndexOf(session);
+        if (i < 0 || Sessions[i].Label == label) return i < 0 ? session : Sessions[i];
+        Sessions[i] = Sessions[i] with { Label = label };
+        Save();
+        Changed?.Invoke();
+        return Sessions[i];
     }
 
     /// <summary>Removes the session from the records for good.</summary>
@@ -85,16 +98,30 @@ internal static class SessionHistory
         }
     }
 
-    /// <summary>The session of the same game played before <paramref name="session"/>, if any.</summary>
+    /// <summary>
+    /// The session of the same game played before <paramref name="session"/>, if any: a benchmark
+    /// run compares with the run before it, a session with the session before it.
+    /// </summary>
     public static GameSession? Previous(GameSession session)
     {
         for (int i = Sessions.Count - 1; i >= 0; i--)
         {
             var s = Sessions[i];
-            if (s.Ended <= session.Started && s.Process.Equals(session.Process, StringComparison.OrdinalIgnoreCase))
+            if (s.Ended <= session.Started && s.Benchmark == session.Benchmark
+                && s.Process.Equals(session.Process, StringComparison.OrdinalIgnoreCase))
                 return s;
         }
         return null;
+    }
+
+    /// <summary>The other benchmark runs of the same game as <paramref name="run"/>, newest first.</summary>
+    public static List<GameSession> OtherRuns(GameSession run)
+    {
+        var runs = new List<GameSession>();
+        foreach (var s in Recent)
+            if (s.Benchmark && s.Process.Equals(run.Process, StringComparison.OrdinalIgnoreCase) && s.Started != run.Started)
+                runs.Add(s);
+        return runs;
     }
 
     public static void Add(GameSession session)

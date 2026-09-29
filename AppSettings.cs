@@ -33,6 +33,9 @@ public sealed class AppSettings : OverlayStyle
     /// <summary>When a game closes, show how the session went. Sessions are recorded either way (tray → last summary).</summary>
     public bool ShowSessionSummary { get; set; } = true;
 
+    /// <summary>How long a benchmark (Ctrl+Shift+B) records, in seconds of play. 0: until the hotkey is pressed again.</summary>
+    public int BenchmarkSeconds { get; set; } = 60;
+
     /// <summary>Open the customise window on launch (logon starts skip it: see <c>--tray</c>).</summary>
     public bool ShowSettingsOnLaunch { get; set; } = true;
 
@@ -85,6 +88,7 @@ public sealed class AppSettings : OverlayStyle
             if (File.Exists(FilePath) && JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), Json) is { } s)
             {
                 s.FixMetrics();
+                s.BenchmarkSeconds = Math.Clamp(s.BenchmarkSeconds, 0, 3600);
                 s.Profiles ??= new();
                 s.Profiles.RemoveAll(p => p is null || string.IsNullOrWhiteSpace(p.Process));
                 foreach (var p in s.Profiles) p.FixMetrics();

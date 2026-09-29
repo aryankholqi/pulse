@@ -41,6 +41,8 @@ public partial class App : Application
     GameSession? _pendingSummary;                  // a game ended while another one was in front
     SessionSummaryWindow? _summaryWindow;
     SavedSummariesWindow? _savedWindow;
+    GameSession? _benchDone;                       // a run that just ended: its result stays on the overlay a moment
+    DateTime _benchDoneUntil;
     bool _exiting;
     int _tick;
 
@@ -103,6 +105,7 @@ public partial class App : Application
         if (!_hotkeys.Register(ModifierKeys.Control | ModifierKeys.Shift, Key.O, ToggleOverlay)) failed.Add("Ctrl+Shift+O");
         if (!_hotkeys.Register(ModifierKeys.Control | ModifierKeys.Shift, Key.L, ToggleCompact)) failed.Add("Ctrl+Shift+L");
         if (!_hotkeys.Register(ModifierKeys.Control | ModifierKeys.Shift, Key.P, CycleCorner)) failed.Add("Ctrl+Shift+P");
+        if (!_hotkeys.Register(ModifierKeys.Control | ModifierKeys.Shift, Key.B, ToggleBenchmark)) failed.Add("Ctrl+Shift+B");
 
         // One UI tick every 500 ms. Background priority = it yields to everything else.
         _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(500) };
@@ -145,8 +148,14 @@ public partial class App : Application
         if (!_sensors.Paused && _sensors.Latest is { } hw) _fps.Sessions.Sample(hw);
         if (_tick % 4 == 0) CollectSessions();
 
+        // a timed benchmark stops by itself once it has recorded its length of play
+        var sessions = _fps.Sessions;
+        if (sessions.BenchmarkRunning && _settings is { BenchmarkSeconds: > 0 } s && sessions.BenchmarkSeconds >= s.BenchmarkSeconds)
+            FinishBenchmark();
+
         if (!_window.IsVisible) return;
         _window.ViewModel.Apply(_sensors.Latest, _fps.GetStats(), _fps.TargetName, _fps.Error);
+        ShowBenchmarkBadge();
 
         // Some games re-assert their own z-order; nudge ours back every ~3 s.
         if (_tick % 6 == 0) _window.EnsureTopmost();
@@ -163,16 +172,21 @@ public partial class App : Application
         if (_fps is null || _settings is null) return;
         var ended = _fps.Sessions.TakeEnded();
         foreach (var session in ended) SessionHistory.Add(session);
-        if (!_settings.ShowSessionSummary) return;
 
-        if (ended.Count == 0)
+        // a benchmark cut short by its game closing: the sensors can rest again
+        if (ended.Exists(s => s.Benchmark)) UpdateSensorPause();
+
+        // A benchmark the player asked for always gets its result; a session only while summaries are on.
+        // Of several that ended together, the run is what the player is waiting for.
+        var latest = ended.FindLast(s => s.Benchmark)
+                     ?? (_settings.ShowSessionSummary && ended.Count > 0 ? ended[^1] : null);
+        if (latest is null)
         {
-            if (_pendingSummary is { } pending && !_fps.Sessions.GameInFront) ShowSummary(pending);
+            if (_pendingSummary is { } pending && !InGameFor(pending)) ShowSummary(pending);
             return;
         }
 
-        var latest = ended[^1];
-        if (_fps.Sessions.GameInFront)
+        if (InGameFor(latest))
         {
             // Already in another game: never pop a window over it. A tray note it is, until that game is over.
             _pendingSummary = latest;
@@ -201,6 +215,94 @@ public partial class App : Application
         window.ContentRendered += (_, _) => window.Topmost = false;
         window.Show();
         window.Activate();
+    }
+
+    // ───────────────────────── benchmark ─────────────────────────
+
+    /// <summary>Ctrl+Shift+B: start a benchmark on the game in front, or stop the one running.</summary>
+    void ToggleBenchmark()
+    {
+        if (_fps is null || _settings is null) return;
+        if (_fps.Sessions.BenchmarkRunning) { FinishBenchmark(); return; }
+
+        if (!_fps.Sessions.StartBenchmark())
+        {
+            _tray?.ShowBalloonTip(4000, "Pulse", Loc.T("BenchNoGame"), Forms.ToolTipIcon.Info);
+            return;
+        }
+        _benchDone = null;
+        UpdateSensorPause(); // temperatures count toward the run, overlay shown or not
+
+        // the overlay's badge says it started; with the overlay hidden, a tray note has to
+        if (_window?.IsVisible == true) ShowBenchmarkBadge();
+        else
+        {
+            string text = _settings.BenchmarkSeconds > 0
+                ? string.Format(Loc.T("BenchStarted"), _settings.BenchmarkSeconds)
+                : Loc.T("BenchStartedOpen");
+            _tray?.ShowBalloonTip(3000, "Pulse", text, Forms.ToolTipIcon.Info);
+        }
+    }
+
+    /// <summary>The run ends (its time is up, or the hotkey again): keep it, and show how it went.</summary>
+    void FinishBenchmark()
+    {
+        if (_fps is null) return;
+        var run = _fps.Sessions.StopBenchmark();
+        UpdateSensorPause();
+
+        if (run is null)
+        {
+            _tray?.ShowBalloonTip(4000, "Pulse", Loc.T("BenchTooShort"), Forms.ToolTipIcon.Info);
+            ShowBenchmarkBadge();
+            return;
+        }
+
+        SessionHistory.Add(run);
+        _benchDone = run;
+        _benchDoneUntil = DateTime.Now.AddSeconds(10);
+        ShowBenchmarkBadge();
+
+        string result = string.Format(Loc.T("BenchDone"), Math.Round(run.AvgFps).ToString("0"),
+            run.Low1 is double low ? Math.Round(low).ToString("0") : "–");
+        if (InGameFor(run))
+        {
+            // still in the game: never pop a window over it. The full result opens once the player leaves it.
+            _pendingSummary = run;
+            if (_window?.IsVisible != true)
+                _tray?.ShowBalloonTip(6000, "Pulse", result + " " + Loc.T("BenchDoneClick"), Forms.ToolTipIcon.Info);
+        }
+        else ShowSummary(run);
+    }
+
+    /// <summary>Is the player in a game that <paramref name="summary"/> mustn't pop up over? For a run, even a windowed one.</summary>
+    bool InGameFor(GameSession summary) =>
+        _fps is { } fps && (summary.Benchmark ? fps.Sessions.PlayingInFront : fps.Sessions.GameInFront);
+
+    /// <summary>"● BENCH 0:42" while a run records (counting down, or up with no set length), then its result for a moment.</summary>
+    void ShowBenchmarkBadge()
+    {
+        if (_window is null || _fps is null || _settings is null) return;
+        var vm = _window.ViewModel;
+        var sessions = _fps.Sessions;
+
+        if (sessions.BenchmarkRunning)
+        {
+            double played = sessions.BenchmarkSeconds;
+            double shown = _settings.BenchmarkSeconds > 0 ? Math.Max(0, _settings.BenchmarkSeconds - played) : played;
+            var t = TimeSpan.FromSeconds(Math.Ceiling(shown));
+            vm.SetBenchmark($"● BENCH {(int)t.TotalMinutes}:{t.Seconds:00}", recording: true);
+        }
+        else if (_benchDone is { } run && DateTime.Now < _benchDoneUntil)
+        {
+            string low = run.Low1 is double l ? Math.Round(l).ToString("0") : "–";
+            vm.SetBenchmark($"BENCH ✓  {Math.Round(run.AvgFps):0} avg · {low} 1% low", recording: false);
+        }
+        else
+        {
+            _benchDone = null;
+            vm.SetBenchmark(null, recording: false);
+        }
     }
 
     void ShowLastSummary()
@@ -247,11 +349,12 @@ public partial class App : Application
         UpdateSensorPause();
     }
 
-    // Hidden overlay and no window open = no sensor polling at all.
+    // Hidden overlay, no window open and no benchmark running = no sensor polling at all.
     void UpdateSensorPause()
     {
         if (_sensors != null)
-            _sensors.Paused = _window?.IsVisible != true && _settingsWindow?.IsVisible != true;
+            _sensors.Paused = _window?.IsVisible != true && _settingsWindow?.IsVisible != true
+                              && _fps?.Sessions.BenchmarkRunning != true;
     }
 
     void ShowSettings()

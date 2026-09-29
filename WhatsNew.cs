@@ -14,6 +14,17 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
+        new(new Version(2, 8, 5), new[]
+        {
+            ("New: benchmark mode. Press Ctrl+Shift+B in a game to record a timed run (30 s, 60 s, 2 min, or until you stop it). " +
+             "The overlay counts down, then shows the result, and the full summary opens once you leave the game.",
+             "جدید: حالت بنچمارک. داخل بازی Ctrl+Shift+B را بزن تا یک اجرای زمان‌دار ثبت شود (۳۰ ثانیه، ۶۰ ثانیه، ۲ دقیقه یا تا وقتی خودت متوقفش کنی). " +
+             "اورلی شمارش معکوس را نشان می‌دهد و بعد نتیجه را، و خلاصه‌ی کامل وقتی از بازی بیرون بیایی باز می‌شود."),
+            ("Name each run (for example DLSS Quality) and compare it with any other run of the same game, to see which setting really gives more FPS. " +
+             "Runs are kept under Summaries until you delete them.",
+             "برای هر اجرا اسم بگذار (مثلاً DLSS Quality) و آن را با هر اجرای دیگرِ همان بازی مقایسه کن تا ببینی کدام تنظیم واقعاً FPS بیشتری می‌دهد. " +
+             "اجراها در «خلاصه‌ها» می‌مانند تا خودت پاکشان کنی."),
+        }),
         new(new Version(2, 7, 1), new[]
         {
             ("Fixed: a game summary you saved now shows up in Summaries right away.",

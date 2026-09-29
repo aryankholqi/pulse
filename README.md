@@ -60,6 +60,16 @@ When you close a game, Pulse shows how the session went (every time, even a shor
 
 Only the time the game was in front counts: alt-tabbed and paused time are left out. If you've already started another game, Pulse doesn't pop up over it. It leaves a tray note you can click instead. Reopen the latest summary any time from the tray menu (**Last game summary…**), and turn the automatic window off in **General** or in the summary itself. The last 100 sessions are kept in `%AppData%\Pulse\sessions.json`.
 
+### Benchmark mode
+
+Testing a setting? Stand somewhere repeatable in the game, press **`Ctrl` + `Shift` + `B`**, and play:
+
+- **Timed runs** of 30 s, 60 s (default) or 2 min, or **until you press the hotkey again**. Choose under **Settings → Benchmark**. Only time in the game counts: alt-tabbed and paused time is left out.
+- **A countdown on the overlay** (`● BENCH 0:42`) while it records, then the result (`BENCH ✓ 97 avg · 71 1% low`) for a few seconds. With the overlay hidden, a tray note says when it starts and ends.
+- **The full result** opens once you leave the game: the same view as the game summary, with the verdict, average FPS, 1% and 0.1% lows, stutters, a second-by-second FPS timeline, what limited it and temperatures.
+- **Name each run** (*DLSS Quality*, *Ultra textures*) and **compare it with any other run** of the same game: step through older and newer runs, and each number shows how it moved (▲ better, ▼ worse).
+- **Every run is kept** under **Summaries**, marked *Benchmark*, until you delete it. Runs compare only with runs, and game sessions only with sessions.
+
 ### Color that means something
 
 - **Temperatures change color** from cool teal to amber (72 °C and up) to red (85 °C and up), so you can spot thermal throttling at a glance.
@@ -161,6 +171,9 @@ The **FPS warnings** switch controls whether FPS turns amber below 60 and red be
 - **Show this window when Pulse starts**: turn this off to skip the customize window and show the overlay right away.
 - **Show a summary after each game**: the session summary when a game closes. Sessions are still recorded when it's off, so the tray can show the last one.
 
+### Benchmark
+- **Length**: 30 s, 60 s, 2 min, or *Until I stop it*. A benchmark always shows its result, even with game summaries turned off.
+
 ### Language
 Switch between **English** and **فارسی** at the top of the window. The change applies right away, including in the tray menu. The overlay itself always uses short universal labels (*fps*, *GPU*, *1% low*).
 
@@ -181,6 +194,7 @@ These work from anywhere, even while the game has focus.
 | `Ctrl` + `Shift` + `O` | Show / hide the overlay |
 | `Ctrl` + `Shift` + `L` | Switch between Full and Compact |
 | `Ctrl` + `Shift` + `P` | Move to the next position |
+| `Ctrl` + `Shift` + `B` | Start / stop a benchmark |
 
 If another app already uses one of these shortcuts, Pulse tells you which one at startup.
 
