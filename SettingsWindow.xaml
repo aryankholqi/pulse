@@ -717,7 +717,7 @@
                     <!-- fills the page up to a readable width, aligned to the start -->
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" MaxWidth="820" />
+                            <ColumnDefinition Width="*" MaxWidth="1100" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <controls:SavedSummaryList x:Name="SavedList" />

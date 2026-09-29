@@ -61,7 +61,26 @@ public partial class SessionSummaryWindow : Window
             SessionHistory.Changed -= saved;
         };
 
-        SourceInitialized += (_, _) => Native.UseDarkTitleBar(new WindowInteropHelper(this).Handle);
+        SourceInitialized += (_, _) =>
+        {
+            Native.UseDarkTitleBar(new WindowInteropHelper(this).Handle);
+            // a compact window by default, the middle scrolls; never taller than the screen (a small laptop or a high scale)
+            MaxHeight = SystemParameters.WorkArea.Height;
+            Height = Math.Min(Height, SystemParameters.WorkArea.Height * 0.9);
+        };
+        SizeChanged += (_, e) => { if (e.WidthChanged) Relayout(e.NewSize.Width); };
+    }
+
+    /// <summary>Narrow window: the numbers two by two, the GPU above the CPU, the switch under the buttons.</summary>
+    void Relayout(double width)
+    {
+        Tiles.Columns = width < 600 ? 2 : 4;
+        HardwareGrid.Columns = width < 520 ? 1 : 2;
+
+        bool narrow = width < 560;
+        Grid.SetRow(ShowAfterGames, narrow ? 1 : 0);
+        Grid.SetColumnSpan(ShowAfterGames, narrow ? 2 : 1);
+        ShowAfterGames.Margin = new Thickness(0, narrow ? 14 : 0, 0, 0);
     }
 
     void Build()
@@ -239,7 +258,7 @@ public partial class SessionSummaryWindow : Window
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14, 10, 12, 12),
-            Margin = new Thickness(4, 0, 4, 0),
+            Margin = new Thickness(4), // the grid's -4 margin evens it out, two rows or one
             Child = stack,
         };
     }
@@ -276,7 +295,7 @@ public partial class SessionSummaryWindow : Window
 
     StackPanel Column(string title, string name)
     {
-        var col = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
+        var col = new StackPanel { Margin = new Thickness(0, 0, 16, 6) }; // the bottom: when stacked in a narrow window
         var head = new TextBlock { Margin = new Thickness(0, 0, 0, 4), TextTrimming = TextTrimming.CharacterEllipsis };
         head.Inlines.Add(new System.Windows.Documents.Run(title) { FontWeight = FontWeights.SemiBold });
         if (name.Length > 0)

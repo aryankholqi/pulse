@@ -255,6 +255,7 @@ public sealed class Loc : INotifyPropertyChanged
         ["SavedEmpty"] = ("Nothing saved yet. Press Save in a game summary to keep it here.",
                           "هنوز چیزی ذخیره نکرده‌ای. در خلاصه‌ی هر بازی روی «ذخیره» بزن تا اینجا بماند."),
         ["SavedOpen"] = ("Open summary", "باز کردن خلاصه"),
+        ["SavedAvg"] = ("Avg FPS", "میانگین FPS"),
         ["SavedDelete"] = ("Delete", "حذف"),
         ["SavedDeleteSure"] = ("Delete for good?", "قطعاً حذف شود؟"),
         ["SavedDeleteHint"] = ("Removes this session from your records", "این بازی را از رکوردهایت پاک می‌کند"),

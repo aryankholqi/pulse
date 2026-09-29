@@ -476,7 +476,11 @@ public partial class SettingsWindow : Window
         _loading = loading;
 
         GpuHotspotNote.SetBinding(System.Windows.Documents.Run.TextProperty,
-            new System.Windows.Data.Binding(supported ? "[GpuHotspotHint]" : "[GpuHotspotUnsupported]") { Source = Loc.Instance });
+            new System.Windows.Data.Binding(supported ? "[GpuHotspotHint]" : "[GpuHotspotUnsupported]")
+            {
+                Source = Loc.Instance,
+                Mode = System.Windows.Data.BindingMode.OneWay, // Run.Text binds two-way by default: that throws on Loc's read-only indexer
+            });
         if (supported) GpuHotspot.ClearValue(ToolTipProperty);
         else
         {

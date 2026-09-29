@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Pulse"
         xmlns:controls="clr-namespace:Pulse.Controls"
         Title="{local:T SumTitle}"
-        Width="640" SizeToContent="Height" ResizeMode="NoResize"
+        Width="640" Height="620" MinWidth="440" MinHeight="360" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
         Background="{StaticResource Bg}"
         FontFamily="Segoe UI" FontSize="13"
@@ -33,7 +33,12 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="24,22,24,20">
+    <Grid Margin="24,22,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
         <!-- header: pulse mark, game, when and how long · verdict -->
         <DockPanel>
@@ -44,8 +49,8 @@
                     <TextBlock x:Name="VerdictText" FontWeight="SemiBold" FontSize="12.5" Margin="7,0,0,0" VerticalAlignment="Center" />
                 </StackPanel>
             </Border>
-            <StackPanel Orientation="Horizontal">
-                <Border Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
+            <DockPanel>
+                <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                             <GradientStop Color="#2A314E" Offset="0" />
@@ -55,15 +60,15 @@
                     <Path Data="M5,21 L12,21 L15,14 L20,28 L24,9 L27,21 L35,21" Stroke="{StaticResource Accent}" StrokeThickness="2.6"
                           StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" FlowDirection="LeftToRight" />
                 </Border>
-                <StackPanel Margin="14,0,16,0" VerticalAlignment="Center" MaxWidth="400">
+                <StackPanel Margin="14,0,16,0" VerticalAlignment="Center">
                     <TextBlock x:Name="GameTitle" FontSize="18" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI"
                                TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="Subtitle" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-            </StackPanel>
+            </DockPanel>
         </DockPanel>
 
-        <ScrollViewer Margin="0,12,0,0" MaxHeight="600" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
             <ScrollViewer.Resources>
                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
             </ScrollViewer.Resources>
@@ -71,7 +76,7 @@
 
                 <!-- the numbers, and how they moved since the last session of this game -->
                 <TextBlock x:Name="Comparison" Foreground="{StaticResource Muted}" FontSize="11.5" Margin="2,0,0,0" TextTrimming="CharacterEllipsis" />
-                <UniformGrid x:Name="Tiles" Columns="4" Rows="1" Margin="-4,8,-4,0" />
+                <UniformGrid x:Name="Tiles" Columns="4" Margin="-4,4,-4,-4" />
 
                 <!-- FPS over the session -->
                 <Border Style="{StaticResource Box}">
@@ -137,11 +142,22 @@
             </StackPanel>
         </ScrollViewer>
 
-        <DockPanel Margin="0,18,0,0">
-            <Button x:Name="OkButton" DockPanel.Dock="Right" Style="{StaticResource Primary}" Content="{local:T WhatsNewOk}"
-                    IsDefault="True" IsCancel="True" />
-            <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource Ghost}" Margin="0,0,10,0" />
+        <!-- footer: the switch beside the buttons, or under them when the window is narrow (see Relayout) -->
+        <Grid x:Name="Footer" Grid.Row="2" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <CheckBox x:Name="ShowAfterGames" Style="{StaticResource Switch}" Content="{local:T SumShowAfter}" VerticalAlignment="Center" />
-        </DockPanel>
-    </StackPanel>
+            <StackPanel x:Name="FooterButtons" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="SaveButton" Style="{StaticResource Ghost}" Margin="0,0,10,0" />
+                <Button x:Name="OkButton" Style="{StaticResource Primary}" Content="{local:T WhatsNewOk}"
+                        IsDefault="True" IsCancel="True" />
+            </StackPanel>
+        </Grid>
+    </Grid>
 </Window>

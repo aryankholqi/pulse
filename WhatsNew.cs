@@ -14,6 +14,19 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
+        new(new Version(2, 7, 1), new[]
+        {
+            ("Fixed: a game summary you saved now shows up in Summaries right away.",
+             "رفع شد: خلاصه‌ای که ذخیره می‌کنی حالا بلافاصله در «خلاصه‌ها» دیده می‌شود."),
+            ("Saved summaries are now cards, two to a row: each shows the game's icon, how it went, " +
+             "average FPS, 1% and 0.1% lows, stutters, FPS across the session, what limited it and how hot it ran.",
+             "خلاصه‌های ذخیره‌شده حالا کارت‌هایی هستند، دوتا در هر ردیف: هر کدام آیکون بازی، وضعیت اجرا، " +
+             "میانگین FPS، 1% و 0.1% low، تعداد افت‌ها، نمودار FPS در طول بازی، عامل محدودکننده و بیشترین دما را نشان می‌دهد."),
+            ("The game summary opens at a comfortable size and can be resized. On a small or narrow screen it rearranges itself and scrolls, " +
+             "instead of running off the screen.",
+             "پنجره‌ی خلاصه‌ی بازی حالا در اندازه‌ای مناسب باز می‌شود و می‌توانی اندازه‌اش را تغییر دهی. روی صفحه‌ی کوچک یا باریک، " +
+             "چیدمانش را تغییر می‌دهد و اسکرول می‌خورد، به‌جای اینکه از صفحه بیرون بزند."),
+        }),
         new(new Version(2, 7, 0), new[]
         {
             ("New: choose the size and color of the overlay's numbers, and of its labels and names. " +

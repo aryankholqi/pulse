@@ -14,6 +14,11 @@ public partial class SavedSummariesWindow : Window
         List.Open += open;
         OkButton.Click += (_, _) => Close();
 
-        SourceInitialized += (_, _) => Native.UseDarkTitleBar(new WindowInteropHelper(this).Handle);
+        SourceInitialized += (_, _) =>
+        {
+            Native.UseDarkTitleBar(new WindowInteropHelper(this).Handle);
+            // grows with the list up to most of the screen, then the list scrolls
+            MaxHeight = SystemParameters.WorkArea.Height * 0.85;
+        };
     }
 }

@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Pulse"
         xmlns:controls="clr-namespace:Pulse.Controls"
         Title="{local:T SavedTitle}"
-        Width="520" SizeToContent="Height" ResizeMode="NoResize"
+        Width="760" MinWidth="400" MinHeight="300" SizeToContent="Height" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
         Background="{StaticResource Bg}"
         FontFamily="Segoe UI" FontSize="13"
@@ -14,11 +14,16 @@
         FlowDirection="{Binding FlowDirection, Source={x:Static local:Loc.Instance}}">
 
     <!-- The game summaries the player saved: open one, or delete it from the records. -->
-    <StackPanel Margin="24,22,24,20">
+    <Grid Margin="24,22,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
         <!-- header: pulse mark + headline -->
-        <StackPanel Orientation="Horizontal">
-            <Border Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
+        <DockPanel>
+            <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                         <GradientStop Color="#2A314E" Offset="0" />
@@ -29,19 +34,21 @@
                       StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" FlowDirection="LeftToRight" />
             </Border>
             <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="{local:T SavedTitle}" FontSize="17" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI" />
-                <TextBlock Text="{local:T SavedSubtitle}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,3,0,0" />
+                <TextBlock Text="{local:T SavedTitle}" FontSize="17" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{local:T SavedSubtitle}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,3,0,0"
+                           TextWrapping="Wrap" />
             </StackPanel>
-        </StackPanel>
+        </DockPanel>
 
-        <ScrollViewer Margin="0,18,0,0" MaxHeight="480" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
             <ScrollViewer.Resources>
                 <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
             </ScrollViewer.Resources>
             <controls:SavedSummaryList x:Name="List" />
         </ScrollViewer>
 
-        <Button x:Name="OkButton" Style="{StaticResource Primary}" Content="{local:T WhatsNewOk}" HorizontalAlignment="Right"
+        <Button x:Name="OkButton" Grid.Row="2" Style="{StaticResource Primary}" Content="{local:T WhatsNewOk}" HorizontalAlignment="Right"
                 Margin="0,16,0,0" IsDefault="True" IsCancel="True" />
-    </StackPanel>
+    </Grid>
 </Window>
