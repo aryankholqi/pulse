@@ -34,6 +34,7 @@ public partial class App : Application
     DispatcherTimer? _timer;
     bool _hintedTray;
     DispatcherTimer? _updateTimer;
+    DispatcherTimer? _saveTimer;
     UpdateInfo? _pendingUpdate;   // found automatically, not yet shown in the dialog
     UpdateWindow? _updateWindow;
     IReadOnlyList<WhatsNew.Release>? _whatsNew;   // just updated: shown once the user opens the window
@@ -138,6 +139,9 @@ public partial class App : Application
         // Game sessions are followed even with the overlay hidden: PresentMon runs anyway,
         // and following the foreground window is a couple of cheap calls.
         _fps.UpdateTarget();
+        if (_settings != null) _window.SetLook(_settings.StyleFor(_fps.TargetName)); // a game with its own profile
+        // The hot spot is a slow read on NVIDIA: only while the overlay's look shows it, or the preview may.
+        _sensors.WantHotspot = _window.Look.ShowGpuHotspot || _settingsWindow?.IsVisible == true;
         if (!_sensors.Paused && _sensors.Latest is { } hw) _fps.Sessions.Sample(hw);
         if (_tick % 4 == 0) CollectSessions();
 
@@ -258,7 +262,8 @@ public partial class App : Application
         if (_settingsWindow is null)
         {
             var sensors = _sensors;
-            _settingsWindow = new SettingsWindow(_settings, () => sensors.Latest, () => _window?.IsVisible == true);
+            _settingsWindow = new SettingsWindow(_settings, () => sensors.Latest, () => sensors.HotspotSupported,
+                () => _window?.IsVisible == true, KnownGames);
             _settingsWindow.Changed += Commit;
             _settingsWindow.LanguageChanged += UpdateTrayLanguage;
             _settingsWindow.LaunchRequested += () =>
@@ -286,6 +291,18 @@ public partial class App : Application
             Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowWhatsNew));
     }
 
+    /// <summary>Games to offer in "Add a game": the one in front now, then the ones played lately.</summary>
+    IReadOnlyList<(string Process, string Name)> KnownGames()
+    {
+        var games = new List<(string, string)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (_fps is { TargetName.Length: > 0 } fps && fps.GetStats().Fps is not null && seen.Add(fps.TargetName))
+            games.Add((fps.TargetName, fps.TargetName));
+        foreach (var s in SessionHistory.Recent)
+            if (s.Process.Length > 0 && seen.Add(s.Process)) games.Add((s.Process, s.Game.Length > 0 ? s.Game : s.Process));
+        return games;
+    }
+
     // ───────────────────────── updates ─────────────────────────
 
     async Task CheckForUpdateAsync()
@@ -295,6 +312,10 @@ public partial class App : Application
         UpdateInfo? update;
         try { update = await UpdateService.CheckAsync(); }
         catch { return; } // offline / GitHub down: try again next time, quietly
+
+        _settings.LastUpdateCheck = DateTime.Now;
+        _settings.Save();
+        _settingsWindow?.ReportUpdate(update);
 
         if (update is null || update.Version.ToString() == _settings.SkippedVersion) return;
         if (_pendingUpdate?.Version == update.Version) return; // already offered this session
@@ -401,24 +422,43 @@ public partial class App : Application
         Shutdown();
     }
 
+    // Hotkeys and the tray change the look on screen: the game's profile while it has one.
     void ToggleCompact()
     {
-        if (_settings is null) return;
-        _settings.Compact = !_settings.Compact;
+        if (_window is null) return;
+        _window.Look.Compact = !_window.Look.Compact;
         Commit();
     }
 
     void CycleCorner()
     {
-        if (_settings is null) return;
-        _settings.Corner = (Corner)(((int)_settings.Corner + 1) % Enum.GetValues<Corner>().Length);
+        if (_window is null) return;
+        var look = _window.Look;
+        look.Corner = (Corner)(((int)look.Corner + 1) % Enum.GetValues<Corner>().Length);
         Commit();
     }
 
     void Commit()
     {
+        // a profile added or turned off for the game in front applies right away
+        if (_window != null && _settings != null && _fps != null) _window.SetLook(_settings.StyleFor(_fps.TargetName));
         _window?.ApplySettings();
-        _settings?.Save();
+        SaveSoon();
+    }
+
+    /// <summary>
+    /// Write settings.json once the changes settle: a slider drag or a run of colour clicks is one write,
+    /// not one per step. <see cref="OnExit"/> writes anything still pending.
+    /// </summary>
+    void SaveSoon()
+    {
+        if (_saveTimer is null)
+        {
+            _saveTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(400) };
+            _saveTimer.Tick += (_, _) => { _saveTimer.Stop(); _settings?.Save(); };
+        }
+        _saveTimer.Stop();
+        _saveTimer.Start();
     }
 
     // ───────────────────────── tray ─────────────────────────
@@ -437,7 +477,7 @@ public partial class App : Application
         miCompact.ShortcutKeyDisplayString = "Ctrl+Shift+L";
 
         var miCorner = Choice("TrayCorner", Array.ConvertAll(Enum.GetValues<Corner>(), c => (c.ToString(), c)),
-            () => _settings!.Corner, v => { _settings!.Corner = v; Commit(); });
+            () => _window!.Look.Corner, v => { _window!.Look.Corner = v; Commit(); });
 
         var miSummary = Item("TrayLastSummary", ShowLastSummary);
         var miSaved = Item("TraySaved", ShowSavedSummaries);
@@ -453,7 +493,7 @@ public partial class App : Application
         });
         _trayMenu.Opening += (_, _) =>
         {
-            if (_settings != null) miCompact.Checked = _settings.Compact;
+            if (_window != null) miCompact.Checked = _window.Look.Compact;
             miToggle.Checked = _window?.IsVisible == true;
         };
         UpdateTrayLanguage();
@@ -540,6 +580,7 @@ public partial class App : Application
         _exiting = true;
         _timer?.Stop();
         _updateTimer?.Stop();
+        _saveTimer?.Stop(); // the Save() below writes anything pending
         _hotkeys?.Dispose();
 
         if (_tray != null)

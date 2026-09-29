@@ -14,6 +14,27 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
+        new(new Version(2, 7, 0), new[]
+        {
+            ("New: choose the size and color of the overlay's numbers, and of its labels and names. " +
+             "Find it under Text in the overlay editor, with a full-size sample of your overlay that shows every change as you make it.",
+             "جدید: اندازه و رنگ اعداد اورلی و برچسب‌ها و نام‌هایش را خودت انتخاب کن. " +
+             "در بخش «متن» ویرایشگر اورلی است، با یک نمونه از اورلی‌ات در اندازه‌ی واقعی که هر تغییر را همان لحظه نشان می‌دهد."),
+            ("You can now turn off heat colors, so temperatures use the same color as the other numbers.",
+             "حالا می‌توانی رنگ گرما را خاموش کنی تا دماها هم رنگ بقیه‌ی اعداد باشند."),
+            ("Drag the overlay anywhere in the preview, right up to the edges of the screen. " +
+             "It no longer jumps to the nearest preset spot, so a corner with no gap at all is easy. " +
+             "The six preset spots are still one click away under Position on screen.",
+             "اورلی را در پیش‌نمایش هر جا خواستی بکش، تا خودِ لبه‌های صفحه. " +
+             "دیگر خودش به نزدیک‌ترین جای آماده نمی‌پرد، پس گذاشتنش در گوشه‌ی صفحه بدون هیچ فاصله‌ای ساده است. " +
+             "شش جای آماده هنوز با یک کلیک در «جای اورلی در صفحه» در دسترس‌اند."),
+            ("Changes in the overlay editor now show up instantly.",
+             "تغییرات در ویرایشگر اورلی حالا بی‌درنگ دیده می‌شوند."),
+            ("On graphics cards that don't report a hot spot temperature (such as the RX 580), that switch is now turned off and explains why.",
+             "روی کارت‌های گرافیکی که دمای هات‌اسپات را گزارش نمی‌دهند (مثل RX 580)، این گزینه حالا غیرفعال است و دلیلش را توضیح می‌دهد."),
+            ("NVIDIA cards: Pulse only reads the hot spot while you show it, which avoids a small hitch every 10 seconds in games.",
+             "کارت‌های انویدیا: Pulse فقط وقتی هات‌اسپات را نمایش می‌دهی آن را می‌خواند، تا هر ۱۰ ثانیه یک افت کوچک در بازی پیش نیاید."),
+        }),
         new(new Version(2, 6, 0), new[]
         {
             ("New: a summary after every game. Close a game and Pulse shows how it went: average FPS, 1% and 0.1% lows, " +
@@ -61,6 +82,10 @@ internal static class WhatsNew
 
     /// <summary>The last release without this popup: upgrades from it have no LastSeenVersion yet.</summary>
     static readonly Version Baseline = new(2, 3, 0);
+
+    /// <summary>The notes of <paramref name="version"/> itself: empty when it has none (a dev build).</summary>
+    public static IReadOnlyList<Release> For(Version version) =>
+        Array.FindAll(Releases, r => r.Version == version);
 
     /// <summary>Releases after <paramref name="lastSeen"/>, up to <paramref name="current"/>. Newest first.</summary>
     public static IReadOnlyList<Release> Since(string? lastSeen, Version current)

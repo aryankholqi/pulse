@@ -4,7 +4,7 @@
         xmlns:local="clr-namespace:Pulse"
         xmlns:controls="clr-namespace:Pulse.Controls"
         Title="Pulse"
-        Width="1280" Height="800" MinWidth="1040" MinHeight="700"
+        Width="1320" Height="820" MinWidth="1120" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource Bg}"
         FontFamily="Segoe UI" FontSize="13"
@@ -16,6 +16,7 @@
     <!--
       Same night-cockpit language as the overlay: ink-blue panels, ivory for the one
       thing that matters (the Launch button), everything else quiet.
+      A sidebar picks the page: the default overlay, per-game profiles, saved summaries, settings.
     -->
     <Window.Resources>
         <Style x:Key="SectionTitle" TargetType="TextBlock">
@@ -62,307 +63,796 @@
             <Setter Property="FontSize" Value="11.5" />
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
         </Style>
+
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="21" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFamily" Value="Bahnschrift, Segoe UI" />
+        </Style>
+
+        <!-- sidebar entry: an icon (Tag) and a label; the open page wears a raised pill and an accent icon -->
+        <Style x:Key="NavItem" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="GroupName" Value="nav" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="B" CornerRadius="10" Background="Transparent" Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="G" Text="{TemplateBinding Tag}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                                           Width="20" VerticalAlignment="Center" FlowDirection="LeftToRight" />
+                                <ContentPresenter Margin="12,0,0,0" VerticalAlignment="Center" Visibility="{DynamicResource NavLabelVisibility}" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Soft}" />
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Surface}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Raised}" />
+                                <Setter TargetName="G" Property="Foreground" Value="{StaticResource Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- the small square beside the brand: collapses the sidebar -->
+        <Style x:Key="PaneButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" CornerRadius="9" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Raised}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Surface}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- collapsed: the logo turns into "expand" under the pointer (or keyboard focus) -->
+        <Style x:Key="LogoExpand" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="11" Background="{StaticResource Raised}" BorderBrush="{StaticResource LineStrong}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="False" />
+                        <Condition Property="IsKeyboardFocused" Value="False" />
+                    </MultiTrigger.Conditions>
+                    <MultiTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </MultiTrigger.EnterActions>
+                    <MultiTrigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </MultiTrigger.ExitActions>
+                </MultiTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Launch squeezed to an icon: the collapsed sidebar has no room for Primary's padding -->
+        <Style x:Key="PrimaryIcon" TargetType="Button" BasedOn="{StaticResource Primary}">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" CornerRadius="10" Background="{StaticResource Text}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="#DCD6CA" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- a square icon button: back to the list of games -->
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Soft}" />
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" CornerRadius="10" Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                <Setter TargetName="B" Property="Background" Value="{StaticResource Surface}" />
+                                <Setter TargetName="B" Property="BorderBrush" Value="{StaticResource LineStrong}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- a keyboard key in the hotkeys list -->
+        <Style x:Key="Key" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Raised}" />
+            <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
+            <Setter Property="BorderThickness" Value="1,1,1,2" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="9,3" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+            <Setter Property="MinWidth" Value="118" />
+            <Setter Property="FlowDirection" Value="LeftToRight" />
+        </Style>
+
+        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
     </Window.Resources>
 
-    <Grid Margin="24,20,24,20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="392" />
-            <ColumnDefinition Width="24" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <!-- one cell: the sidebar at the start edge, the pages beside it through their start margin (both animated in code) -->
+    <Grid>
 
-        <!-- ═════════ header ═════════ -->
-        <DockPanel Grid.ColumnSpan="3" Margin="0,0,0,18">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{local:T Language}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <Border Style="{StaticResource Segmented}">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="LangEn" Style="{StaticResource Segment}" GroupName="lang" Content="English" Padding="12,5" />
-                        <RadioButton x:Name="LangFa" Style="{StaticResource Segment}" GroupName="lang" Content="فارسی" Padding="12,5" />
+        <!-- ═════════ sidebar: full, or icons only (its width is animated in code) ═════════ -->
+        <Border x:Name="Sidebar" Width="232" HorizontalAlignment="Left" Panel.ZIndex="1" ClipToBounds="True" Background="{StaticResource Sunken}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+            <DockPanel x:Name="SidebarInner" Margin="16,20,16,20">
+                <Grid DockPanel.Dock="Top" Margin="2,0,0,26">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Width="40" Height="40" VerticalAlignment="Center">
+                        <Border CornerRadius="11">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#2A314E" Offset="0" />
+                                    <GradientStop Color="#131727" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Path Data="M5,21 L12,21 L15,14 L20,28 L24,9 L27,21 L35,21" Stroke="{StaticResource Text}" StrokeThickness="2.6"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" FlowDirection="LeftToRight" />
+                        </Border>
+                        <Button x:Name="ExpandButton" Style="{StaticResource LogoExpand}" Visibility="Collapsed">
+                            <TextBlock x:Name="ExpandGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" FlowDirection="LeftToRight" />
+                        </Button>
+                    </Grid>
+
+                    <StackPanel x:Name="BrandText" Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                        <TextBlock Text="Pulse" FontSize="20" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI" />
+                        <TextBlock x:Name="SidebarVersion" Style="{StaticResource Hint}" />
                     </StackPanel>
-                </Border>
-            </StackPanel>
 
-            <StackPanel Orientation="Horizontal">
-                <Border Width="40" Height="40" CornerRadius="11" VerticalAlignment="Center">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#2A314E" Offset="0" />
-                            <GradientStop Color="#131727" Offset="1" />
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <Path Data="M5,21 L12,21 L15,14 L20,28 L24,9 L27,21 L35,21" Stroke="{StaticResource Text}" StrokeThickness="2.6"
-                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" FlowDirection="LeftToRight" />
-                </Border>
-                <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="Pulse" FontSize="22" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI" />
-                    <TextBlock Text="{local:T Subtitle}" Style="{StaticResource Hint}" FontSize="12.5" />
+                    <Button x:Name="CollapseButton" Grid.Column="2" Style="{StaticResource PaneButton}" VerticalAlignment="Center">
+                        <TextBlock x:Name="CollapseGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="15" FlowDirection="LeftToRight" />
+                    </Button>
+                </Grid>
+
+                <!-- launch / quit stay in reach from every page -->
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Button x:Name="LaunchButton" Style="{StaticResource Primary}" IsDefault="True" HorizontalAlignment="Stretch" />
+                    <Button x:Name="QuitButton" Style="{StaticResource Ghost}" Margin="0,8,0,0" HorizontalAlignment="Stretch" />
                 </StackPanel>
-            </StackPanel>
-        </DockPanel>
 
-        <!-- ═════════ controls ═════════ -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ScrollViewer.Resources>
-                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimScrollBar}" />
-            </ScrollViewer.Resources>
-            <StackPanel>
+                <StackPanel>
+                    <RadioButton x:Name="NavOverlay" Style="{StaticResource NavItem}" Tag="&#xE7F4;" Content="{local:T NavOverlay}" />
+                    <RadioButton x:Name="NavProfiles" Style="{StaticResource NavItem}" Tag="&#xE7FC;" Content="{local:T NavProfiles}" />
+                    <RadioButton x:Name="NavSummaries" Style="{StaticResource NavItem}" Tag="&#xE9D2;" Content="{local:T NavSummaries}" />
+                    <RadioButton x:Name="NavSettings" Style="{StaticResource NavItem}" Tag="&#xE713;" Content="{local:T NavSettings}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
 
-                <!-- layout -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <TextBlock Text="{local:T Layout}" Style="{StaticResource SectionTitle}" />
-                        <UniformGrid Columns="2">
-                            <RadioButton x:Name="LayoutCompact" Style="{StaticResource Tile}" GroupName="layout" Margin="0,0,5,0" AutomationProperties.Name="{local:T Compact}">
+        <!-- ═════════ pages ═════════ -->
+        <!-- the start margin makes room for the sidebar: it slides along with the sidebar's width -->
+        <Grid x:Name="PagesHost" Margin="260,22,28,24">
+
+            <!-- overlay: the default look, for every game without a profile -->
+            <Grid x:Name="OverlayPage">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,18">
+                    <TextBlock Text="{local:T NavOverlay}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{local:T OverlayPageHint}" Style="{StaticResource Hint}" FontSize="12.5" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <ContentControl x:Name="OverlayEditorHost" Grid.Row="1" Focusable="False">
+                    <!-- the editor: every look option and a live preview. One instance, moved to the profile page while a game is edited. -->
+                    <Grid x:Name="Editor">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="392" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <ScrollViewer x:Name="EditorScroll" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+
+                                <!-- layout -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <TextBlock Text="{local:T Layout}" Style="{StaticResource SectionTitle}" />
+                                        <UniformGrid Columns="2">
+                                            <RadioButton x:Name="LayoutCompact" Style="{StaticResource Tile}" GroupName="layout" Margin="0,0,5,0" AutomationProperties.Name="{local:T Compact}">
+                                                <StackPanel>
+                                                    <Border Height="38" CornerRadius="7" Background="{StaticResource Sunken}" Margin="0,0,0,10">
+                                                        <Border Width="104" Height="9" CornerRadius="4.5" Background="{StaticResource Faint}" />
+                                                    </Border>
+                                                    <TextBlock Text="{local:T Compact}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T CompactHint}" Style="{StaticResource Hint}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                            <RadioButton x:Name="LayoutFull" Style="{StaticResource Tile}" GroupName="layout" Margin="5,0,0,0" AutomationProperties.Name="{local:T Full}">
+                                                <StackPanel>
+                                                    <Border Height="38" CornerRadius="7" Background="{StaticResource Sunken}" Margin="0,0,0,10">
+                                                        <StackPanel Width="52" VerticalAlignment="Center">
+                                                            <Border Height="7" Width="26" CornerRadius="3.5" Background="{StaticResource Faint}" HorizontalAlignment="Left" />
+                                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,4,0,0" Opacity="0.7" />
+                                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,3,0,0" Opacity="0.7" />
+                                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,3,0,0" Opacity="0.7" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <TextBlock Text="{local:T Full}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T FullHint}" Style="{StaticResource Hint}" />
+                                                </StackPanel>
+                                            </RadioButton>
+                                        </UniformGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- metrics: what the overlay shows, one row each; the last two left on lock themselves.
+                                     Rows bleed into the panel padding (-12) so their text lines up with the section title. -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{local:T MetricsMin}" Style="{StaticResource Hint}" />
+                                            <TextBlock Text="{local:T Metrics}" Style="{StaticResource SectionTitle}" />
+                                        </DockPanel>
+
+                                        <StackPanel Margin="-12,-4,-12,-6">
+                                            <CheckBox x:Name="MetricFps" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                                <StackPanel>
+                                                    <TextBlock Text="FPS" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </CheckBox>
+
+                                            <!-- FPS extras: nested under FPS, shown only while it's on -->
+                                            <Border x:Name="FpsExtras" Margin="24,0,0,6" Padding="6,0,0,0"
+                                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
+                                                <StackPanel>
+                                                    <CheckBox x:Name="FpsBottleneck" Style="{StaticResource SubRowSwitch}">
+                                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{local:T Bottleneck}" /><Run Text="   " /><Run Text="{local:T BottleneckHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
+                                                        </TextBlock>
+                                                    </CheckBox>
+
+                                                    <!-- opens the guide: what each tag means and what to do about it -->
+                                                    <Button x:Name="BottleneckGuideButton" Style="{StaticResource InfoButton}" HorizontalAlignment="Left" Margin="6,2,6,6">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Grid Width="16" Height="16" VerticalAlignment="Center">
+                                                                <Ellipse Stroke="{StaticResource Accent}" StrokeThickness="1.4" />
+                                                                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="11" Foreground="{StaticResource Accent}"
+                                                                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
+                                                            </Grid>
+                                                            <TextBlock Text="{local:T BottleneckGuideOpen}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Style="{StaticResource RowRule}" />
+
+                                            <CheckBox x:Name="MetricGpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                                <StackPanel>
+                                                    <TextBlock Text="GPU" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T MetricGpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </CheckBox>
+
+                                            <!-- GPU extras: nested under GPU, shown only while it's on -->
+                                            <Border x:Name="GpuExtras" Margin="24,0,0,6" Padding="6,0,0,0"
+                                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
+                                                <StackPanel>
+                                                    <CheckBox x:Name="GpuHotspot" Style="{StaticResource SubRowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{local:T GpuHotspot}" /><Run Text="   " /><Run x:Name="GpuHotspotNote" Text="{local:T GpuHotspotHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
+                                                        </TextBlock>
+                                                    </CheckBox>
+                                                    <CheckBox x:Name="CompactVram" Style="{StaticResource SubRowSwitch}" ToolTip="{local:T CompactVramHint}">
+                                                        <TextBlock TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{local:T CompactVram}" />
+                                                        </TextBlock>
+                                                    </CheckBox>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Style="{StaticResource RowRule}" />
+
+                                            <CheckBox x:Name="MetricCpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                                <StackPanel>
+                                                    <TextBlock Text="CPU" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T MetricCpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </CheckBox>
+                                            <Border Style="{StaticResource RowRule}" />
+
+                                            <CheckBox x:Name="MetricRam" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                                                <StackPanel>
+                                                    <TextBlock Text="RAM" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{local:T MetricRamHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </CheckBox>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- position: a miniature screen, click where the overlay should sit (or drag it in the preview) -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock x:Name="PositionName" DockPanel.Dock="Right" Style="{StaticResource Hint}" />
+                                            <TextBlock Text="{local:T Position}" Style="{StaticResource SectionTitle}" />
+                                        </DockPanel>
+                                        <Border Background="{StaticResource Sunken}" CornerRadius="10" Padding="8" Height="150"
+                                                BorderBrush="{StaticResource Line}" BorderThickness="1" FlowDirection="LeftToRight">
+                                            <Grid>
+                                                <UniformGrid x:Name="PositionGrid" Rows="2" Columns="3" />
+                                                <!-- a spot of their own: shown where it is, among the six -->
+                                                <Canvas x:Name="PositionMarkerLayer" IsHitTestVisible="False">
+                                                    <Border x:Name="PositionMarker" Width="44" Height="10" CornerRadius="5" Background="{StaticResource Text}"
+                                                            Visibility="Collapsed" />
+                                                </Canvas>
+                                            </Grid>
+                                        </Border>
+                                        <DockPanel Margin="2,10,0,0">
+                                            <TextBlock DockPanel.Dock="Left" Text="&#xE7C2;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                                       Foreground="{StaticResource Muted}" VerticalAlignment="Top" Margin="0,1,0,0" FlowDirection="LeftToRight" />
+                                            <TextBlock Text="{local:T PositionDragHint}" Style="{StaticResource Hint}" Margin="8,0,0,0" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- colours -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button x:Name="ResetColors" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T ResetColors}" VerticalAlignment="Top" />
+                                            <TextBlock Text="{local:T Colors}" Style="{StaticResource SectionTitle}" />
+                                        </DockPanel>
+                                        <StackPanel x:Name="ColorRows" />
+                                        <CheckBox x:Name="FpsWarnings" Style="{StaticResource Switch}" Margin="0,6,0,0" Content="{local:T FpsWarnings}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- text: size and colour of the numbers, and of the labels — one tab each -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button x:Name="ResetText" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T ResetText}" VerticalAlignment="Top" />
+                                            <TextBlock Text="{local:T Text}" Style="{StaticResource SectionTitle}" />
+                                        </DockPanel>
+
+                                        <!-- specimen: the card as it will look (compact or full), at its real size, sample numbers ticking,
+                                             over the preview's scene. Wider than the panel: it scrolls sideways rather than shrink. -->
+                                        <Grid x:Name="TextStage" Margin="0,0,0,14" FlowDirection="LeftToRight">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" MinHeight="84" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <!-- a brush, not an Image: the scene fills the stage without setting its height -->
+                                            <Rectangle Grid.RowSpan="2">
+                                                <Rectangle.Fill>
+                                                    <ImageBrush x:Name="TextStageScene" Stretch="UniformToFill" />
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+                                            <Border Grid.RowSpan="2" Background="#33000000" />
+                                            <ScrollViewer x:Name="TextStageScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                                          Focusable="False">
+                                                <Grid x:Name="TextStagePan" Background="Transparent" MinHeight="84">
+                                                    <local:OverlayCard x:Name="TextSample" IsHitTestVisible="False" Margin="16"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </ScrollViewer>
+                                            <Border Grid.Row="1" Background="#80000000" Padding="10,4,10,5">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" x:Name="TextSampleScrollHint" Text="&#xE8AB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                               FontSize="11" Foreground="{StaticResource Soft}" VerticalAlignment="Center" Visibility="Collapsed" />
+                                                    <TextBlock x:Name="TextSampleTag" FontSize="10.5" Foreground="{StaticResource Soft}" VerticalAlignment="Center"
+                                                               FlowDirection="{Binding FlowDirection, Source={x:Static local:Loc.Instance}}" />
+                                                </DockPanel>
+                                            </Border>
+                                            <Border Grid.RowSpan="2" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10" IsHitTestVisible="False" />
+                                        </Grid>
+
+                                        <Border Style="{StaticResource Segmented}" Margin="0,0,0,14">
+                                            <UniformGrid Columns="2">
+                                                <RadioButton x:Name="TextNumbersTab" Style="{StaticResource Segment}" GroupName="textpart" Padding="0,6"
+                                                             IsChecked="True" AutomationProperties.Name="{local:T TextNumbers}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="123" FontFamily="Bahnschrift, Segoe UI" FontSize="13.5" Margin="0,0,7,0" FlowDirection="LeftToRight" />
+                                                        <TextBlock Text="{local:T TextNumbers}" />
+                                                    </StackPanel>
+                                                </RadioButton>
+                                                <RadioButton x:Name="TextLabelsTab" Style="{StaticResource Segment}" GroupName="textpart" Padding="0,6"
+                                                             AutomationProperties.Name="{local:T TextLabels}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="Aa" FontSize="13.5" Margin="0,0,7,0" FlowDirection="LeftToRight" />
+                                                        <TextBlock Text="{local:T TextLabels}" />
+                                                    </StackPanel>
+                                                </RadioButton>
+                                            </UniformGrid>
+                                        </Border>
+
+                                        <DockPanel>
+                                            <TextBlock x:Name="TextSizeValue" DockPanel.Dock="Right" Width="44" TextAlignment="Right" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{local:T Size}" Width="96" VerticalAlignment="Center" />
+                                            <Slider x:Name="TextSizeSlider" Style="{StaticResource Slim}" Minimum="0.8" Maximum="1.5" SmallChange="0.05" LargeChange="0.1"
+                                                    IsSnapToTickEnabled="True" TickFrequency="0.05" AutomationProperties.Name="{local:T Size}" />
+                                        </DockPanel>
+
+                                        <!-- the colour row's own tag ("123" / "Aa") wears the colour -->
+                                        <StackPanel x:Name="TextColorRows" Margin="0,16,0,0" />
+
+                                        <CheckBox x:Name="HeatColors" Style="{StaticResource Switch}" Margin="0,2,0,0" Content="{local:T HeatColors}" />
+
+                                        <DockPanel Margin="2,12,0,0">
+                                            <TextBlock DockPanel.Dock="Left" Text="&#xE946;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                                       Foreground="{StaticResource Muted}" VerticalAlignment="Top" Margin="0,1,0,0" FlowDirection="LeftToRight" />
+                                            <TextBlock x:Name="TextNote" Style="{StaticResource Hint}" Margin="8,0,0,0" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- appearance -->
+                                <Border Style="{StaticResource Panel}">
+                                    <StackPanel>
+                                        <TextBlock Text="{local:T Appearance}" Style="{StaticResource SectionTitle}" />
+                                        <DockPanel>
+                                            <TextBlock x:Name="ScaleValue" DockPanel.Dock="Right" Width="44" TextAlignment="Right" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{local:T Size}" Width="96" VerticalAlignment="Center" />
+                                            <Slider x:Name="ScaleSlider" Style="{StaticResource Slim}" Minimum="0.8" Maximum="1.5" SmallChange="0.05" LargeChange="0.1"
+                                                    IsSnapToTickEnabled="True" TickFrequency="0.05" />
+                                        </DockPanel>
+                                        <DockPanel Margin="0,12,0,0">
+                                            <TextBlock x:Name="OpacityValue" DockPanel.Dock="Right" Width="44" TextAlignment="Right" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{local:T Glass}" Width="96" VerticalAlignment="Center" />
+                                            <Slider x:Name="OpacitySlider" Style="{StaticResource Slim}" Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                                                    IsSnapToTickEnabled="True" TickFrequency="0.05" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- ═════════ preview ═════════ -->
+                        <Border Grid.Column="2" Style="{StaticResource Panel}" Margin="0" Padding="18,16,18,18">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel>
+                                    <CheckBox x:Name="HudToggle" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="{local:T GameHud}" VerticalAlignment="Top" />
+                                    <CheckBox x:Name="ZoomToggle" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="{local:T Zoom}" VerticalAlignment="Top" Margin="0,0,22,0" />
+                                    <StackPanel>
+                                        <TextBlock Text="{local:T Preview}" Style="{StaticResource SectionTitle}" Margin="0" />
+                                        <TextBlock Text="{local:T PreviewHint}" Style="{StaticResource Hint}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <WrapPanel x:Name="SceneChips" Grid.Row="1" Margin="0,14,0,14" />
+
+                                <!-- the screen: real primary-display size in DIPs, scaled down as a whole -->
+                                <Viewbox x:Name="PreviewBox" Grid.Row="2" Stretch="Uniform" FlowDirection="LeftToRight">
+                                    <Grid x:Name="Screen" Background="#05060B">
+                                        <Grid x:Name="Stage">
+                                            <Image x:Name="SceneImage" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image x:Name="HudImage" Stretch="Fill" />
+                                            <Canvas x:Name="CardCanvas">
+                                                <local:OverlayCard x:Name="PreviewCard" />
+                                            </Canvas>
+                                        </Grid>
+                                    </Grid>
+                                </Viewbox>
+
+                                <!-- stands in for the preview while the sidebar slides: a small still is cheap to rescale every frame -->
+                                <Image x:Name="PreviewSnapshot" Grid.Row="2" Stretch="Uniform" FlowDirection="LeftToRight" Visibility="Collapsed" />
+
+                                <DockPanel Grid.Row="3" Margin="0,12,0,0">
+                                    <TextBlock x:Name="ScreenInfo" DockPanel.Dock="Right" Style="{StaticResource Hint}" FlowDirection="LeftToRight" />
+                                    <TextBlock x:Name="SceneCaption" Style="{StaticResource Hint}" Foreground="{StaticResource Soft}" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ContentControl>
+            </Grid>
+
+            <!-- game profiles: a look of its own for any game -->
+            <Grid x:Name="ProfilesPage" Visibility="Collapsed">
+
+                <!-- the list: your games, and games to add -->
+                <Grid x:Name="ProfileList">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Margin="0,0,0,18">
+                        <TextBlock Text="{local:T NavProfiles}" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="{local:T ProfilesHint}" Style="{StaticResource Hint}" FontSize="12.5" Margin="0,3,0,0" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <Border Style="{StaticResource Panel}">
                                 <StackPanel>
-                                    <Border Height="38" CornerRadius="7" Background="{StaticResource Sunken}" Margin="0,0,0,10">
-                                        <Border Width="104" Height="9" CornerRadius="4.5" Background="{StaticResource Faint}" />
-                                    </Border>
-                                    <TextBlock Text="{local:T Compact}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T CompactHint}" Style="{StaticResource Hint}" />
+                                    <TextBlock Text="{local:T ProfilesYours}" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="ProfilesEmpty" Text="{local:T ProfilesEmpty}" Style="{StaticResource Hint}" FontSize="12.5"
+                                               TextWrapping="Wrap" LineHeight="20" />
+                                    <WrapPanel x:Name="ProfileCards" />
                                 </StackPanel>
-                            </RadioButton>
-                            <RadioButton x:Name="LayoutFull" Style="{StaticResource Tile}" GroupName="layout" Margin="5,0,0,0" AutomationProperties.Name="{local:T Full}">
+                            </Border>
+
+                            <Border Style="{StaticResource Panel}" Margin="0">
                                 <StackPanel>
-                                    <Border Height="38" CornerRadius="7" Background="{StaticResource Sunken}" Margin="0,0,0,10">
-                                        <StackPanel Width="52" VerticalAlignment="Center">
-                                            <Border Height="7" Width="26" CornerRadius="3.5" Background="{StaticResource Faint}" HorizontalAlignment="Left" />
-                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,4,0,0" Opacity="0.7" />
-                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,3,0,0" Opacity="0.7" />
-                                            <Border Height="3" CornerRadius="1.5" Background="{StaticResource Faint}" Margin="0,3,0,0" Opacity="0.7" />
+                                    <DockPanel Margin="0,0,0,12">
+                                        <Button x:Name="BrowseGame" DockPanel.Dock="Right" Style="{StaticResource InfoButton}" VerticalAlignment="Top">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE8E5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" FlowDirection="LeftToRight" />
+                                                <TextBlock Text="{local:T ProfilesBrowse}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="{local:T ProfilesAdd}" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" />
+                                            <TextBlock Text="{local:T ProfilesAddHint}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <TextBlock x:Name="RecentEmpty" Text="{local:T ProfilesNoRecent}" Style="{StaticResource Hint}" FontSize="12.5"
+                                               TextWrapping="Wrap" LineHeight="20" />
+                                    <WrapPanel x:Name="RecentGames" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- one game's look: the same editor as the overlay page -->
+                <Grid x:Name="ProfileDetail" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Margin="0,0,0,18">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <CheckBox x:Name="ProfileEnabled" Style="{StaticResource Switch}" Content="{local:T ProfileEnabled}" VerticalAlignment="Center" />
+                            <Button x:Name="ProfileReset" Style="{StaticResource Link}" Content="{local:T ProfileReset}" FontSize="12"
+                                    ToolTip="{local:T ProfileResetHint}" VerticalAlignment="Center" Margin="22,0,0,0" />
+                            <Button x:Name="ProfileDelete" Style="{StaticResource Link}" FontSize="12" VerticalAlignment="Center" Margin="18,0,0,0"
+                                    ToolTip="{local:T ProfileDeleteHint}" />
+                        </StackPanel>
+
+                        <Button x:Name="ProfileBack" DockPanel.Dock="Left" Style="{StaticResource IconButton}"
+                                VerticalAlignment="Center" Margin="0,0,14,0" ToolTip="{local:T ProfileBack}"
+                                AutomationProperties.Name="{local:T ProfileBack}">
+                            <!-- the arrow is set in code: it points left in English, right in Persian -->
+                            <TextBlock x:Name="ProfileBackGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" FlowDirection="LeftToRight" />
+                        </Button>
+
+                        <!-- the game's icon; a click points Pulse to its .exe -->
+                        <Button x:Name="ProfileIconButton" DockPanel.Dock="Left" Style="{StaticResource Link}" Margin="0,0,14,0" VerticalAlignment="Center" />
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="ProfileTitle" Style="{StaticResource PageTitle}" TextTrimming="CharacterEllipsis"
+                                       FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="ProfileSubtitle" Style="{StaticResource Hint}" FontSize="12.5" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <ContentControl x:Name="ProfileEditorHost" Grid.Row="1" Focusable="False" />
+                </Grid>
+            </Grid>
+
+            <!-- saved game summaries -->
+            <Grid x:Name="SummariesPage" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,18">
+                    <Button x:Name="LastSummaryButton" DockPanel.Dock="Right" Style="{StaticResource InfoButton}" Content="{local:T LastSummary}" VerticalAlignment="Center" />
+                    <StackPanel>
+                        <TextBlock Text="{local:T SavedTitle}" Style="{StaticResource PageTitle}" />
+                        <TextBlock Text="{local:T SavedSubtitle}" Style="{StaticResource Hint}" FontSize="12.5" Margin="0,3,0,0" />
+                    </StackPanel>
+                </DockPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <!-- fills the page up to a readable width, aligned to the start -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MaxWidth="820" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <controls:SavedSummaryList x:Name="SavedList" />
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- settings: language, general, hotkeys, thanks -->
+            <Grid x:Name="SettingsPage" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Margin="0,0,0,18">
+                    <TextBlock Text="{local:T NavSettings}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{local:T SettingsHint}" Style="{StaticResource Hint}" FontSize="12.5" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <!-- up to a readable width, aligned to the start (a start-aligned Grid would size its * columns to content) -->
+                    <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MaxWidth="1180" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <!-- two columns side by side; one under the other when the window is narrow (code) -->
+                    <Grid x:Name="SettingsGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel>
+                            <Border Style="{StaticResource Panel}">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource Segmented}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton x:Name="LangEn" Style="{StaticResource Segment}" GroupName="lang" Content="English" Padding="12,5" />
+                                            <RadioButton x:Name="LangFa" Style="{StaticResource Segment}" GroupName="lang" Content="فارسی" Padding="12,5" />
                                         </StackPanel>
                                     </Border>
-                                    <TextBlock Text="{local:T Full}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T FullHint}" Style="{StaticResource Hint}" />
-                                </StackPanel>
-                            </RadioButton>
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
+                                    <TextBlock Text="{local:T Language}" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Border>
 
-                <!-- metrics: what the overlay shows, one row each; the last two left on lock themselves.
-                     Rows bleed into the panel padding (-12) so their text lines up with the section title. -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <DockPanel>
-                            <TextBlock DockPanel.Dock="Right" Text="{local:T MetricsMin}" Style="{StaticResource Hint}" />
-                            <TextBlock Text="{local:T Metrics}" Style="{StaticResource SectionTitle}" />
-                        </DockPanel>
-
-                        <StackPanel Margin="-12,-4,-12,-6">
-                            <CheckBox x:Name="MetricFps" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                            <!-- general -->
+                            <Border Style="{StaticResource Panel}">
                                 <StackPanel>
-                                    <TextBlock Text="FPS" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T MetricFpsHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{local:T General}" Style="{StaticResource SectionTitle}" />
+                                    <CheckBox x:Name="StartWithWindows" Style="{StaticResource Switch}" Content="{local:T StartWithWindows}" IsEnabled="False" />
+                                    <CheckBox x:Name="ShowOnLaunch" Style="{StaticResource Switch}" Content="{local:T ShowOnLaunch}" Margin="0,12,0,0" />
+                                    <CheckBox x:Name="ShowSummary" Style="{StaticResource Switch}" Content="{local:T ShowSummary}" Margin="0,12,0,0" />
                                 </StackPanel>
-                            </CheckBox>
+                            </Border>
 
-                            <!-- FPS extras: nested under FPS, shown only while it's on -->
-                            <Border x:Name="FpsExtras" Margin="24,0,0,6" Padding="6,0,0,0"
-                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
+                            <Border Style="{StaticResource Panel}">
                                 <StackPanel>
-                                    <CheckBox x:Name="FpsBottleneck" Style="{StaticResource SubRowSwitch}">
-                                        <TextBlock TextTrimming="CharacterEllipsis">
-                                            <Run Text="{local:T Bottleneck}" /><Run Text="   " /><Run Text="{local:T BottleneckHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
-                                        </TextBlock>
-                                    </CheckBox>
+                                    <TextBlock Text="{local:T HotkeysTitle}" Style="{StaticResource SectionTitle}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + Shift + O" FontFamily="Bahnschrift, Segoe UI" /></Border>
+                                        <TextBlock Text="{local:T HotkeyToggle}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + Shift + L" FontFamily="Bahnschrift, Segoe UI" /></Border>
+                                        <TextBlock Text="{local:T HotkeyCompact}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + Shift + P" FontFamily="Bahnschrift, Segoe UI" /></Border>
+                                        <TextBlock Text="{local:T HotkeyMove}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Border Style="{StaticResource Key}"><TextBlock Text="Ctrl + B" FontFamily="Bahnschrift, Segoe UI" /></Border>
+                                        <TextBlock Text="{local:T HotkeySidebar}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{local:T HotkeysProfileHint}" Style="{StaticResource Hint}" Margin="0,12,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
-                                    <!-- opens the guide: what each tag means and what to do about it -->
-                                    <Button x:Name="BottleneckGuideButton" Style="{StaticResource InfoButton}" HorizontalAlignment="Left" Margin="6,2,6,6">
+                        <StackPanel x:Name="SettingsSide" Grid.Column="2">
+                            <!-- updates: where this Pulse stands, and one button that does the next useful thing -->
+                            <Border Style="{StaticResource Panel}">
+                                <StackPanel>
+                                    <TextBlock Text="{local:T UpdatesTitle}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
+                                    <DockPanel>
+                                        <Button x:Name="UpdateAction" DockPanel.Dock="Right" Style="{StaticResource Ghost}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        <Border x:Name="UpdateTile" DockPanel.Dock="Left" Width="48" Height="48" CornerRadius="14" VerticalAlignment="Center">
+                                            <TextBlock x:Name="UpdateGlyph" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="20" FlowDirection="LeftToRight"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                                <TextBlock.RenderTransform>
+                                                    <RotateTransform x:Name="UpdateSpin" />
+                                                </TextBlock.RenderTransform>
+                                            </TextBlock>
+                                        </Border>
+                                        <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="UpdateVersion" FontSize="16" FontWeight="SemiBold" FontFamily="Bahnschrift, Segoe UI"
+                                                       FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                                            <DockPanel Margin="0,5,0,0">
+                                                <Ellipse x:Name="UpdateDot" Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                <TextBlock x:Name="UpdateStatus" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <Border Height="1" Background="{StaticResource Line}" Margin="0,18,0,14" />
+                                    <CheckBox x:Name="AutoUpdate" Style="{StaticResource Switch}" Content="{local:T AutoUpdate}" />
+                                    <TextBlock Text="{local:T AutoUpdateHint}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="44,3,0,0" />
+
+                                    <Button x:Name="WhatsNewLink" Style="{StaticResource Link}" FontSize="12" Margin="0,14,0,0" HorizontalAlignment="Left">
                                         <StackPanel Orientation="Horizontal">
-                                            <Grid Width="16" Height="16" VerticalAlignment="Center">
-                                                <Ellipse Stroke="{StaticResource Accent}" StrokeThickness="1.4" />
-                                                <TextBlock Text="i" FontFamily="Georgia" FontWeight="Bold" FontSize="11" Foreground="{StaticResource Accent}"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
-                                            </Grid>
-                                            <TextBlock Text="{local:T BottleneckGuideOpen}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="&#xE789;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" FlowDirection="LeftToRight" />
+                                            <TextBlock Text="{local:T UpdatesWhatsNew}" Margin="8,0,0,0" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource RowRule}" />
 
-                            <CheckBox x:Name="MetricGpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
+                            <!-- thanks: channels that shared Pulse (list in Supporters.cs) -->
+                            <Border x:Name="SupportersPanel" Style="{StaticResource Panel}">
                                 <StackPanel>
-                                    <TextBlock Text="GPU" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T MetricGpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </CheckBox>
-
-                            <!-- GPU extras: nested under GPU, shown only while it's on -->
-                            <Border x:Name="GpuExtras" Margin="24,0,0,6" Padding="6,0,0,0"
-                                    BorderBrush="{StaticResource LineStrong}" BorderThickness="1.5,0,0,0">
-                                <StackPanel>
-                                    <CheckBox x:Name="GpuHotspot" Style="{StaticResource SubRowSwitch}">
-                                        <TextBlock TextTrimming="CharacterEllipsis">
-                                            <Run Text="{local:T GpuHotspot}" /><Run Text="   " /><Run Text="{local:T GpuHotspotHint}" Foreground="{StaticResource Muted}" FontSize="11.5" />
-                                        </TextBlock>
-                                    </CheckBox>
-                                    <CheckBox x:Name="CompactVram" Style="{StaticResource SubRowSwitch}" ToolTip="{local:T CompactVramHint}">
-                                        <TextBlock TextTrimming="CharacterEllipsis">
-                                            <Run Text="{local:T CompactVram}" />
-                                        </TextBlock>
-                                    </CheckBox>
+                                    <TextBlock Text="{local:T Supporters}" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" />
+                                    <TextBlock Text="{local:T SupportersHint}" Style="{StaticResource Hint}" Margin="0,0,0,12" TextWrapping="Wrap" />
+                                    <StackPanel x:Name="SupporterList" />
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource RowRule}" />
-
-                            <CheckBox x:Name="MetricCpu" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
-                                <StackPanel>
-                                    <TextBlock Text="CPU" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T MetricCpuHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </CheckBox>
-                            <Border Style="{StaticResource RowRule}" />
-
-                            <CheckBox x:Name="MetricRam" Style="{StaticResource RowSwitch}" ToolTipService.ShowOnDisabled="True">
-                                <StackPanel>
-                                    <TextBlock Text="RAM" FontWeight="SemiBold" />
-                                    <TextBlock Text="{local:T MetricRamHint}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </CheckBox>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- position: a miniature screen, click where the overlay should sit -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <DockPanel>
-                            <TextBlock x:Name="PositionName" DockPanel.Dock="Right" Style="{StaticResource Hint}" />
-                            <TextBlock Text="{local:T Position}" Style="{StaticResource SectionTitle}" />
-                        </DockPanel>
-                        <Border Background="{StaticResource Sunken}" CornerRadius="10" Padding="8" Height="150"
-                                BorderBrush="{StaticResource Line}" BorderThickness="1" FlowDirection="LeftToRight">
-                            <UniformGrid x:Name="PositionGrid" Rows="2" Columns="3" />
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <!-- colours -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <DockPanel>
-                            <Button x:Name="ResetColors" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T ResetColors}" VerticalAlignment="Top" />
-                            <TextBlock Text="{local:T Colors}" Style="{StaticResource SectionTitle}" />
-                        </DockPanel>
-                        <StackPanel x:Name="ColorRows" />
-                        <CheckBox x:Name="FpsWarnings" Style="{StaticResource Switch}" Margin="0,6,0,0" Content="{local:T FpsWarnings}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- appearance -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <TextBlock Text="{local:T Appearance}" Style="{StaticResource SectionTitle}" />
-                        <DockPanel>
-                            <TextBlock x:Name="ScaleValue" DockPanel.Dock="Right" Width="44" TextAlignment="Right" Style="{StaticResource Hint}" VerticalAlignment="Center" />
-                            <TextBlock Text="{local:T Size}" Width="96" VerticalAlignment="Center" />
-                            <Slider x:Name="ScaleSlider" Style="{StaticResource Slim}" Minimum="0.8" Maximum="1.5" SmallChange="0.05" LargeChange="0.1"
-                                    IsSnapToTickEnabled="True" TickFrequency="0.05" />
-                        </DockPanel>
-                        <DockPanel Margin="0,12,0,0">
-                            <TextBlock x:Name="OpacityValue" DockPanel.Dock="Right" Width="44" TextAlignment="Right" Style="{StaticResource Hint}" VerticalAlignment="Center" />
-                            <TextBlock Text="{local:T Glass}" Width="96" VerticalAlignment="Center" />
-                            <Slider x:Name="OpacitySlider" Style="{StaticResource Slim}" Minimum="0.3" Maximum="1" SmallChange="0.05" LargeChange="0.1"
-                                    IsSnapToTickEnabled="True" TickFrequency="0.05" />
-                        </DockPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- general -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <TextBlock Text="{local:T General}" Style="{StaticResource SectionTitle}" />
-                        <CheckBox x:Name="StartWithWindows" Style="{StaticResource Switch}" Content="{local:T StartWithWindows}" IsEnabled="False" />
-                        <CheckBox x:Name="ShowOnLaunch" Style="{StaticResource Switch}" Content="{local:T ShowOnLaunch}" Margin="0,10,0,0" />
-                        <CheckBox x:Name="ShowSummary" Style="{StaticResource Switch}" Content="{local:T ShowSummary}" Margin="0,10,0,0" />
-                        <CheckBox x:Name="AutoUpdate" Style="{StaticResource Switch}" Content="{local:T AutoUpdate}" Margin="0,10,0,0" />
-
-                        <!-- version + manual check -->
-                        <Border Height="1" Background="{StaticResource Line}" Margin="0,14,0,12" />
-                        <DockPanel>
-                            <Button x:Name="CheckUpdates" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T CheckNow}" VerticalAlignment="Center" />
-                            <TextBlock x:Name="UpdateStatus" Style="{StaticResource Hint}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </DockPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- saved game summaries: open one, or delete it; the last summary is a click away too -->
-                <Border Style="{StaticResource Panel}">
-                    <StackPanel>
-                        <DockPanel Margin="0,0,0,10">
-                            <Button x:Name="LastSummaryButton" DockPanel.Dock="Right" Style="{StaticResource Link}" Content="{local:T LastSummary}" VerticalAlignment="Center" />
-                            <TextBlock Text="{local:T SavedTitle}" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center" />
-                        </DockPanel>
-                        <controls:SavedSummaryList x:Name="SavedList" />
-                    </StackPanel>
-                </Border>
-
-                <!-- thanks: channels that shared Pulse (list in Supporters.cs) -->
-                <Border x:Name="SupportersPanel" Style="{StaticResource Panel}" Margin="0">
-                    <StackPanel>
-                        <TextBlock Text="{local:T Supporters}" Style="{StaticResource SectionTitle}" Margin="0,0,0,2" />
-                        <TextBlock Text="{local:T SupportersHint}" Style="{StaticResource Hint}" Margin="0,0,0,12" TextWrapping="Wrap" />
-                        <StackPanel x:Name="SupporterList" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-
-        <!-- ═════════ preview ═════════ -->
-        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Panel}" Margin="0" Padding="18,16,18,18">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <DockPanel>
-                    <CheckBox x:Name="HudToggle" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="{local:T GameHud}" VerticalAlignment="Top" />
-                    <CheckBox x:Name="ZoomToggle" DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="{local:T Zoom}" VerticalAlignment="Top" Margin="0,0,22,0" />
-                    <StackPanel>
-                        <TextBlock Text="{local:T Preview}" Style="{StaticResource SectionTitle}" Margin="0" />
-                        <TextBlock Text="{local:T PreviewHint}" Style="{StaticResource Hint}" Margin="0,2,0,0" />
-                    </StackPanel>
-                </DockPanel>
-
-                <WrapPanel x:Name="SceneChips" Grid.Row="1" Margin="0,14,0,14" />
-
-                <!-- the screen: real primary-display size in DIPs, scaled down as a whole -->
-                <Viewbox Grid.Row="2" Stretch="Uniform" FlowDirection="LeftToRight">
-                    <Grid x:Name="Screen" Background="#05060B">
-                        <Grid x:Name="Stage">
-                            <Image x:Name="SceneImage" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Image x:Name="HudImage" Stretch="Fill" />
-                            <Canvas>
-                                <local:OverlayCard x:Name="PreviewCard" />
-                            </Canvas>
-                        </Grid>
                     </Grid>
-                </Viewbox>
-
-                <DockPanel Grid.Row="3" Margin="0,12,0,0">
-                    <TextBlock x:Name="ScreenInfo" DockPanel.Dock="Right" Style="{StaticResource Hint}" FlowDirection="LeftToRight" />
-                    <TextBlock x:Name="SceneCaption" Style="{StaticResource Hint}" Foreground="{StaticResource Soft}" TextTrimming="CharacterEllipsis" />
-                </DockPanel>
+                    </Grid>
+                </ScrollViewer>
             </Grid>
-        </Border>
-
-        <!-- ═════════ footer ═════════ -->
-        <DockPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,18,0,0">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button x:Name="QuitButton" Style="{StaticResource Ghost}" Content="{local:T Quit}" Margin="0,0,10,0" />
-                <Button x:Name="LaunchButton" Style="{StaticResource Primary}" IsDefault="True" />
-            </StackPanel>
-            <TextBlock Text="{local:T Hotkeys}" Style="{StaticResource Hint}" VerticalAlignment="Center" FontFamily="Segoe UI" />
-        </DockPanel>
+        </Grid>
     </Grid>
 </Window>

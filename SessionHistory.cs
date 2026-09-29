@@ -76,6 +76,15 @@ internal static class SessionHistory
 
     public static GameSession? Latest => Sessions.Count > 0 ? Sessions[^1] : null;
 
+    /// <summary>Every recorded session, newest first.</summary>
+    public static IEnumerable<GameSession> Recent
+    {
+        get
+        {
+            for (int i = Sessions.Count - 1; i >= 0; i--) yield return Sessions[i];
+        }
+    }
+
     /// <summary>The session of the same game played before <paramref name="session"/>, if any.</summary>
     public static GameSession? Previous(GameSession session)
     {

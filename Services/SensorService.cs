@@ -32,15 +32,24 @@ public sealed class SensorService : IDisposable
     bool _gpuHotspotEchoesCore;
 
     // NVIDIA: temperature, load and VRAM from NVML every second. The hot spot only comes through
-    // LibreHardwareMonitor's full (slow) update, so that runs every HotspotEvery polls, and never on RTX 50.
+    // LibreHardwareMonitor's full (slow) update, so that runs every HotspotEvery polls, never on RTX 50,
+    // and only while something shows the hot spot.
     const int HotspotEvery = 10;
     Nvml? _nvml;
     int _hotspotCountdown;
     float? _nvHotspot;
+    volatile bool _wantHotspot = true;
+    volatile int _hotspotSupport;   // 0 = not known yet, 1 = the GPU has a hot spot sensor, -1 = it doesn't
 
     public HardwareSnapshot? Latest => Volatile.Read(ref _latest);
     public string? Error { get; private set; }
     public bool Paused { get => _paused; set => _paused = value; }
+
+    /// <summary>False: skip NVIDIA's slow hot spot read (~85 ms of driver calls) — nothing shows it.</summary>
+    public bool WantHotspot { get => _wantHotspot; set => _wantHotspot = value; }
+
+    /// <summary>Whether the GPU reports a hot spot at all; null until the sensors have started (or if they failed).</summary>
+    public bool? HotspotSupported => _hotspotSupport switch { 1 => true, -1 => false, _ => null };
 
     public void Start()
     {
@@ -56,6 +65,7 @@ public sealed class SensorService : IDisposable
             _computer.Open();
             SelectHardware(_computer);
             if (_gpu is { HardwareType: HardwareType.GpuNvidia }) _nvml = Nvml.Open(_gpu.Name);
+            _hotspotSupport = GpuHasHotspot() ? 1 : -1;
         }
         catch (Exception ex)
         {
@@ -111,6 +121,26 @@ public sealed class SensorService : IDisposable
         _gpuHotspotEchoesCore = _gpu is { HardwareType: HardwareType.GpuNvidia } nv
             && (nv.Name.StartsWith("NVIDIA GeForce RTX 50", StringComparison.OrdinalIgnoreCase)
                 || nv.Name.Contains("Blackwell", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Does the chosen GPU have a hot spot sensor? Polaris (RX 400/500) and older report only the edge
+    /// temperature; RTX 50 dropped it from NVAPI. Runs once, after the first full update of the GPU.
+    /// </summary>
+    bool GpuHasHotspot()
+    {
+        if (_gpu is null) return false;
+        if (_gpuHotspotEchoesCore)
+            return _nvml is null && HasSensor(_gpu, SensorType.Temperature, "GPU Hot Spot #1");
+        return HasSensor(_gpu, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "GPU Junction");
+    }
+
+    static bool HasSensor(IHardware hw, SensorType type, params string[] names)
+    {
+        foreach (var s in hw.Sensors)
+            if (s.SensorType == type && Array.Exists(names, n => string.Equals(s.Name, n, StringComparison.OrdinalIgnoreCase)))
+                return true;
+        return false;
     }
 
     HardwareSnapshot Poll()
@@ -170,7 +200,12 @@ public sealed class SensorService : IDisposable
     /// <summary>The hot spot next to NVML's readings: refreshed every <see cref="HotspotEvery"/> polls. RTX 50 has none.</summary>
     float? NvidiaHotspot()
     {
-        if (_gpu is null || _gpuHotspotEchoesCore) return null;
+        if (_gpu is null || _hotspotSupport < 0) return null; // no sensor: never pay for the slow update
+        if (!_wantHotspot)
+        {
+            _hotspotCountdown = 0; // read at once when it's wanted again
+            return _nvHotspot = null;
+        }
         if (--_hotspotCountdown > 0) return _nvHotspot;
 
         _hotspotCountdown = HotspotEvery;

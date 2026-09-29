@@ -8,14 +8,16 @@ public partial class OverlayWindow : Window
 {
     public const double EdgeMargin = 16;
 
-    readonly AppSettings _settings;
     IntPtr _hwnd;
 
     public OverlayViewModel ViewModel { get; } = new();
 
-    public OverlayWindow(AppSettings settings)
+    /// <summary>The look on screen: the default one, or the profile of the game in front.</summary>
+    public OverlayStyle Look { get; private set; }
+
+    public OverlayWindow(OverlayStyle style)
     {
-        _settings = settings;
+        Look = style;
         InitializeComponent();
         DataContext = ViewModel;
         SizeChanged += (_, _) => Reposition();
@@ -31,9 +33,17 @@ public partial class OverlayWindow : Window
 
     public void ApplySettings()
     {
-        Card.ApplySettings(_settings);
-        ViewModel.ApplyStyle(_settings);
+        Card.ApplySettings(Look);
+        ViewModel.ApplyStyle(Look);
         Reposition();
+    }
+
+    /// <summary>Wear another look (a game with its own profile came to the front, or left).</summary>
+    public void SetLook(OverlayStyle style)
+    {
+        if (ReferenceEquals(style, Look)) return;
+        Look = style;
+        ApplySettings();
     }
 
     public void Reposition()
@@ -41,10 +51,18 @@ public partial class OverlayWindow : Window
         double w = ActualWidth, h = ActualHeight;
         if (w <= 0 || h <= 0) return;
 
-        (Left, Top) = Place(_settings.Corner, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight, w, h);
+        (Left, Top) = Place(Look, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight, w, h);
     }
 
-    /// <summary>Top-left of a <paramref name="w"/>×<paramref name="h"/> card on a screen — shared with the preview.</summary>
+    /// <summary>Top-left of a <paramref name="w"/>×<paramref name="h"/> card for a look — shared with the preview.</summary>
+    public static (double Left, double Top) Place(OverlayStyle look, double sw, double sh, double w, double h)
+    {
+        if (look.Corner != Corner.Custom) return Place(look.Corner, sw, sh, w, h);
+        double roomX = Math.Max(0, sw - w), roomY = Math.Max(0, sh - h);
+        return (Math.Round(Math.Clamp(look.CustomX, 0, 1) * roomX), Math.Round(Math.Clamp(look.CustomY, 0, 1) * roomY));
+    }
+
+    /// <summary>Top-left of a <paramref name="w"/>×<paramref name="h"/> card in one of the six spots.</summary>
     public static (double Left, double Top) Place(Corner corner, double sw, double sh, double w, double h)
     {
         double left = EdgeMargin, center = Math.Round((sw - w) / 2), right = sw - w - EdgeMargin;

@@ -1,46 +1,34 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Pulse;
 
-public enum Corner { TopLeft, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight }
+/// <summary>Where the overlay sits: one of six spots, or <see cref="Custom"/> (anywhere, see <see cref="OverlayStyle.CustomX"/>).</summary>
+public enum Corner { TopLeft, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight, Custom }
 
 public enum AppLanguage { English, Persian }
 
-public sealed class AppSettings
+/// <summary>Everything Pulse remembers. The overlay's default look comes from <see cref="OverlayStyle"/>.</summary>
+public sealed class AppSettings : OverlayStyle
 {
-    public const string DefaultFpsColor = "#F6F1E7";
-    public const string DefaultGpuColor = "#B39DFF";
-    public const string DefaultCpuColor = "#7CC8FF";
-    public const string DefaultRamColor = "#FF9A85";
-
-    public Corner Corner { get; set; } = Corner.TopLeft;
-    public bool Compact { get; set; } = true;
-    public double Scale { get; set; } = 1.0;
-    public double BackgroundOpacity { get; set; } = 0.92;
-
     public AppLanguage Language { get; set; } = AppLanguage.English;
 
-    // ── what the overlay shows (at least MinMetrics stay on) ──
-    public const int MinMetrics = 2;
-    public bool ShowFps { get; set; } = true;
-    public bool ShowGpu { get; set; } = true;
-    public bool ShowCpu { get; set; } = true;
-    public bool ShowRam { get; set; } = true;
+    /// <summary>Games with an overlay look of their own.</summary>
+    public List<GameProfile> Profiles { get; set; } = new();
 
-    /// <summary>GPU-bound / CPU-bound / Capped next to the FPS. Opt-in; hidden while PresentMon can't tell.</summary>
-    public bool ShowBottleneck { get; set; }
+    /// <summary>The enabled profile for <paramref name="process"/>, if there is one.</summary>
+    public GameProfile? ProfileFor(string? process) =>
+        string.IsNullOrEmpty(process) ? null
+            : Profiles.Find(p => p.Enabled && p.Process.Equals(process, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>GPU hot spot (junction) temp next to the core temp. Opt-in; hidden anyway on GPUs that don't report it.</summary>
-    public bool ShowGpuHotspot { get; set; }
+    /// <summary>The look the overlay wears while <paramref name="process"/> is in front.</summary>
+    public OverlayStyle StyleFor(string? process) => (OverlayStyle?)ProfileFor(process) ?? this;
 
-    /// <summary>VRAM used in the compact line (the full layout always shows it). Opt-in.</summary>
-    public bool ShowCompactVram { get; set; }
-
-    [JsonIgnore]
-    public int MetricCount => (ShowFps ? 1 : 0) + (ShowGpu ? 1 : 0) + (ShowCpu ? 1 : 0) + (ShowRam ? 1 : 0);
+    /// <summary>The main window's sidebar shows icons only.</summary>
+    public bool SidebarCollapsed { get; set; }
 
     /// <summary>When a game closes, show how the session went. Sessions are recorded either way (tray → last summary).</summary>
     public bool ShowSessionSummary { get; set; } = true;
@@ -51,6 +39,9 @@ public sealed class AppSettings
     // ── updates (GitHub Releases) ──
     public bool CheckForUpdates { get; set; } = true;
 
+    /// <summary>When Pulse last reached GitHub for a new version (by hand or in the background).</summary>
+    public DateTime? LastUpdateCheck { get; set; }
+
     /// <summary>A version the user chose "Skip this version" for: never offered again automatically.</summary>
     public string? SkippedVersion { get; set; }
 
@@ -60,15 +51,6 @@ public sealed class AppSettings
     /// <summary>No settings file yet: a fresh install, so there's nothing "new" to announce.</summary>
     [JsonIgnore]
     public bool FirstRun { get; private set; }
-
-    // ── colours (#RRGGBB) ──
-    public string FpsColor { get; set; } = DefaultFpsColor;
-    public string GpuColor { get; set; } = DefaultGpuColor;
-    public string CpuColor { get; set; } = DefaultCpuColor;
-    public string RamColor { get; set; } = DefaultRamColor;
-
-    /// <summary>FPS turns amber below 60 and red below 30, whatever its own colour.</summary>
-    public bool FpsWarnings { get; set; } = true;
 
     // ── preview only ──
     public string PreviewScene { get; set; } = "tlou1";
@@ -102,8 +84,10 @@ public sealed class AppSettings
         {
             if (File.Exists(FilePath) && JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), Json) is { } s)
             {
-                // A hand-edited file with too few metrics: bring them all back.
-                if (s.MetricCount < MinMetrics) s.ShowFps = s.ShowGpu = s.ShowCpu = s.ShowRam = true;
+                s.FixMetrics();
+                s.Profiles ??= new();
+                s.Profiles.RemoveAll(p => p is null || string.IsNullOrWhiteSpace(p.Process));
+                foreach (var p in s.Profiles) p.FixMetrics();
                 return s;
             }
         }

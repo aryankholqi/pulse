@@ -14,7 +14,7 @@ public partial class BottleneckGuideWindow : Window
 {
     readonly Brush _gpuHue, _cpuHue;
 
-    internal BottleneckGuideWindow(AppSettings settings)
+    internal BottleneckGuideWindow(OverlayStyle settings)
     {
         // the tags in the colors the overlay draws them in
         _gpuHue = ColorUtil.Solid(ColorUtil.Parse(settings.GpuColor, AppSettings.DefaultGpuColor));

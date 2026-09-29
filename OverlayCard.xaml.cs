@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,13 +12,30 @@ namespace Pulse;
 /// </summary>
 public partial class OverlayCard : UserControl
 {
+    /// <summary>Only with no background: a tight dark halo, the way on-screen displays stay readable anywhere.</summary>
+    static readonly System.Windows.Media.Effects.DropShadowEffect Legible = MakeLegible();
+
+    static System.Windows.Media.Effects.DropShadowEffect MakeLegible()
+    {
+        var e = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Colors.Black,
+            ShadowDepth = 0,
+            BlurRadius = 3,
+            Opacity = 1,
+            RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
+        };
+        e.Freeze();
+        return e;
+    }
+
     public OverlayCard()
     {
         InitializeComponent();
     }
 
     /// <summary>Layout, size, glass opacity and colours from settings.</summary>
-    public void ApplySettings(AppSettings settings)
+    public void ApplySettings(OverlayStyle settings)
     {
         double scale = Math.Clamp(settings.Scale, 0.6, 2.0);
         RootScale.ScaleX = scale;
@@ -31,15 +49,21 @@ public partial class OverlayCard : UserControl
 
         ApplyMetrics(settings);
 
-        // Fade only the glass, never the numbers.
-        if (Card.Background is { IsFrozen: false } glass)
-            glass.Opacity = Math.Clamp(settings.BackgroundOpacity, 0.2, 1.0);
+        // Fade only the glass, never the numbers. At 0 the card goes entirely: no glass, no rim,
+        // and a soft shadow under the figures keeps them readable on a bright scene.
+        double opacity = Math.Clamp(settings.BackgroundOpacity, 0, 1.0);
+        bool bare = opacity < 0.01;
+        if (Card.Background is { IsFrozen: false } glass) glass.Opacity = opacity;
+        Card.BorderThickness = new Thickness(bare ? 0 : 1);
+        Figures.Effect = bare ? Legible : null;
+        Card.Effect = bare ? Legible : null; // a second pass: one soft halo is too faint around thin text
+        ApplyText(settings, bare);
 
         ApplyTheme(settings);
     }
 
     /// <summary>Show only the metrics the user picked, with dividers and gaps only between visible ones.</summary>
-    void ApplyMetrics(AppSettings s)
+    void ApplyMetrics(OverlayStyle s)
     {
         Show(FullFps, s.ShowFps);
         Show(CompactFps, s.ShowFps);
@@ -65,10 +89,69 @@ public partial class OverlayCard : UserControl
         }
     }
 
+    // The stock size of every text role (see the card's resources), scaled by the user's size.
+    static readonly (string Key, double Size)[] NumberSizes =
+        [("NumHero", 44), ("NumCompactHero", 18), ("NumLow", 17), ("Num", 16), ("NumHotspot", 13), ("NumSmall", 12)];
+    static readonly (string Key, double Size)[] LabelSizes =
+        [("LblDevice", 11), ("LblUnit", 12), ("LblNote", 10)];
+    const double FullWidth = 238;
+
+    static readonly Color Glass = Color.FromRgb(0x17, 0x1B, 0x2E); // the glass under the text, for quieter shades
+
+    /// <summary>
+    /// Sizes and colours of the numbers and the labels. The quiet shades (secondary numbers, notes,
+    /// meter tracks, rules) are tuned for the dark glass; with no glass they'd vanish into a bright scene, so
+    /// they lighten. The brushes are shared by the card's styles: recolouring them is enough.
+    /// </summary>
+    void ApplyText(OverlayStyle s, bool bare)
+    {
+        double num = Math.Clamp(s.NumberSize, OverlayStyle.MinTextSize, OverlayStyle.MaxTextSize);
+        double lbl = Math.Clamp(s.LabelSize, OverlayStyle.MinTextSize, OverlayStyle.MaxTextSize);
+        foreach (var (key, size) in NumberSizes) Put(key, Math.Round(size * num, 1));
+        foreach (var (key, size) in LabelSizes) Put(key, Math.Round(size * lbl, 1));
+        Put("Divider", Math.Round(14 * Math.Max(num, lbl)));
+        FullPanel.Width = Math.Round(FullWidth * Math.Max(num, lbl)); // the columns take what the text needs; the meters share the rest
+
+        // Numbers: the main figures in the colour, the secondary ones (loads, 1% low) a step quieter.
+        var ink = ColorUtil.Parse(s.NumberColor, OverlayStyle.DefaultNumberColor);
+        bool stockInk = ink == ColorUtil.Parse(OverlayStyle.DefaultNumberColor, OverlayStyle.DefaultNumberColor);
+        Tint("Ink", ink);
+        Tint("NumSoft", stockInk ? Stock(bare ? 0xE6E9F2 : 0xA3AAC2) : bare ? ink : ColorUtil.Mix(ink, Glass, 0.3));
+
+        // Labels: names and units in the colour, the smallest notes a step quieter.
+        var label = ColorUtil.Parse(s.LabelColor, OverlayStyle.DefaultLabelColor);
+        bool stockLabel = label == ColorUtil.Parse(OverlayStyle.DefaultLabelColor, OverlayStyle.DefaultLabelColor);
+        Tint("Soft", stockLabel ? Stock(bare ? 0xE6E9F2 : 0xA3AAC2) : label);
+        Tint("Faint", stockLabel ? Stock(bare ? 0xB9BFD1 : 0x5E6680)
+                                 : ColorUtil.Mix(label, bare ? Colors.Gray : Glass, bare ? 0.2 : 0.4));
+
+        Tint("TrackBrush", Color.FromArgb((byte)(bare ? 0x40 : 0x1C), 0xFF, 0xFF, 0xFF));
+        Tint("RuleBrush", Color.FromArgb((byte)(bare ? 0x30 : 0x14), 0xFF, 0xFF, 0xFF));
+    }
+
+    static Color Stock(int rgb) => Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
+
+    void Tint(string key, Color color)
+    {
+        if (Resources[key] is SolidColorBrush { IsFrozen: false } brush && brush.Color != color) brush.Color = color;
+    }
+
+    /// <summary>
+    /// Replace a resource only when its value really changes: every replacement makes WPF re-resolve the
+    /// resource through the whole card, and one colour click shouldn't redo all twenty of them.
+    /// </summary>
+    void Put(string key, object value)
+    {
+        if (!Equals(Resources[key], value)) Resources[key] = value;
+    }
+
     static void Show(UIElement element, bool on) =>
         element.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
 
-    void ApplyTheme(AppSettings s)
+    // The last colours put in the resources, so an unchanged one isn't rebuilt (see Put).
+    readonly Dictionary<string, Color> _hues = new();
+
+    void ApplyTheme(OverlayStyle s)
     {
         SetHue("Gpu", ColorUtil.Parse(s.GpuColor, AppSettings.DefaultGpuColor));
         SetHue("Cpu", ColorUtil.Parse(s.CpuColor, AppSettings.DefaultCpuColor));
@@ -76,13 +159,22 @@ public partial class OverlayCard : UserControl
 
         // The frame-time trace wears the FPS colour.
         Color fps = ColorUtil.Parse(s.FpsColor, AppSettings.DefaultFpsColor);
+        if (!Changed("Trace", fps)) return;
         Resources["TraceStroke"] = ColorUtil.Solid(fps);
         Resources["TraceArea"] = ColorUtil.Frozen(new LinearGradientBrush(
             Color.FromArgb(0x2E, fps.R, fps.G, fps.B), Color.FromArgb(0, fps.R, fps.G, fps.B), 90));
     }
 
+    bool Changed(string key, Color color)
+    {
+        if (_hues.TryGetValue(key, out var last) && last == color) return false;
+        _hues[key] = color;
+        return true;
+    }
+
     void SetHue(string device, Color hue)
     {
+        if (!Changed(device, hue)) return;
         Resources[device + "Hue"] = ColorUtil.Solid(hue);
         Resources[device + "Fill"] = ColorUtil.Frozen(new LinearGradientBrush(
             ColorUtil.Mix(hue, Colors.Black, 0.28), ColorUtil.Mix(hue, Colors.White, 0.2), 0));

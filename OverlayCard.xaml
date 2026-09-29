@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:Pulse.Controls"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              UseLayoutRounding="True" SnapsToDevicePixels="True"
              FontFamily="Segoe UI" FlowDirection="LeftToRight"
              TextOptions.TextRenderingMode="Grayscale">
@@ -16,35 +17,49 @@
     <UserControl.Resources>
         <!-- GpuHue / CpuHue / RamHue, their *Fill gradients and the Trace* brushes are
              user colours: OverlayCard.ApplyTheme puts them in these resources. -->
+        <!-- Text is user-sized too (OverlayCard.ApplyText): each size below is the stock size, scaled in code,
+             so the hierarchy always holds. -->
         <FontFamily x:Key="Digits">Bahnschrift, Segoe UI</FontFamily>
+        <sys:Double x:Key="NumHero">44</sys:Double>
+        <sys:Double x:Key="NumCompactHero">18</sys:Double>
+        <sys:Double x:Key="NumLow">17</sys:Double>
+        <sys:Double x:Key="Num">16</sys:Double>
+        <sys:Double x:Key="NumHotspot">13</sys:Double>
+        <sys:Double x:Key="NumSmall">12</sys:Double>
+        <sys:Double x:Key="LblDevice">11</sys:Double>
+        <sys:Double x:Key="LblUnit">12</sys:Double>
+        <sys:Double x:Key="LblNote">10</sys:Double>
+        <sys:Double x:Key="Divider">14</sys:Double>
 
+        <!-- Ink / NumSoft: numbers; Soft / Faint: labels. Recoloured in place by OverlayCard.ApplyText. -->
         <SolidColorBrush x:Key="Ink" Color="#F6F1E7" />
+        <SolidColorBrush x:Key="NumSoft" Color="#A3AAC2" />
         <SolidColorBrush x:Key="Soft" Color="#A3AAC2" />
         <SolidColorBrush x:Key="Faint" Color="#5E6680" />
         <SolidColorBrush x:Key="TrackBrush" Color="#1CFFFFFF" />
         <SolidColorBrush x:Key="RuleBrush" Color="#14FFFFFF" />
 
         <Style x:Key="Device" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="{DynamicResource LblDevice}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="Note" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontSize" Value="{DynamicResource LblNote}" />
             <Setter Property="Foreground" Value="{StaticResource Faint}" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="Figure" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{StaticResource Digits}" />
-            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontSize" Value="{DynamicResource Num}" />
             <Setter Property="Foreground" Value="{StaticResource Ink}" />
             <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="FigureRight" TargetType="TextBlock" BasedOn="{StaticResource Figure}">
             <Setter Property="HorizontalAlignment" Value="Right" />
-            <Setter Property="Foreground" Value="{StaticResource Soft}" />
+            <Setter Property="Foreground" Value="{StaticResource NumSoft}" />
         </Style>
     </UserControl.Resources>
 
@@ -67,9 +82,9 @@
                 </LinearGradientBrush>
             </Border.BorderBrush>
 
-            <Grid>
+            <Grid x:Name="Figures">
                 <!-- ═════════ Full layout ═════════ -->
-                <StackPanel x:Name="FullPanel" Width="238">
+                <StackPanel x:Name="FullPanel" Width="238" Grid.IsSharedSizeScope="True">
 
                     <StackPanel x:Name="FullFps">
                         <!-- whose frames we're counting -->
@@ -92,13 +107,13 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}"
-                                       FontFamily="{StaticResource Digits}" FontSize="44"
+                                       FontFamily="{StaticResource Digits}" FontSize="{DynamicResource NumHero}"
                                        Typography.NumeralAlignment="Tabular" Margin="-2,-4,0,-6" />
-                            <TextBlock Grid.Column="1" Text="fps" FontSize="12" Foreground="{StaticResource Soft}"
+                            <TextBlock Grid.Column="1" Text="fps" FontSize="{DynamicResource LblUnit}" Foreground="{StaticResource Soft}"
                                        VerticalAlignment="Bottom" Margin="6,0,0,6" />
 
                             <StackPanel Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,4">
-                                <TextBlock Text="{Binding FpsLowText}" Style="{StaticResource FigureRight}" FontSize="17" />
+                                <TextBlock Text="{Binding FpsLowText}" Style="{StaticResource FigureRight}" FontSize="{DynamicResource NumLow}" />
                                 <TextBlock Text="1% low" Style="{StaticResource Note}" HorizontalAlignment="Right" />
                             </StackPanel>
                         </Grid>
@@ -120,10 +135,10 @@
                     <!-- GPU (top margins of the device rows are set in code: only between visible rows) -->
                     <Grid x:Name="FullGpu">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="34" />
-                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="Auto" MinWidth="34" SharedSizeGroup="Tag" />
+                            <ColumnDefinition Width="Auto" MinWidth="44" SharedSizeGroup="Temp" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="Auto" MinWidth="40" SharedSizeGroup="Load" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -139,7 +154,7 @@
 
                         <!-- hot spot (junction): only on GPUs that report it -->
                         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding GpuHotspotText}" Foreground="{Binding GpuHotspotBrush}"
-                                   Visibility="{Binding GpuHotspotVisibility}" Style="{StaticResource Figure}" FontSize="12" />
+                                   Visibility="{Binding GpuHotspotVisibility}" Style="{StaticResource Figure}" FontSize="{DynamicResource NumSmall}" />
                         <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Text="hot spot" Margin="2,0,0,0"
                                    Visibility="{Binding GpuHotspotVisibility}" Style="{StaticResource Note}" />
 
@@ -152,10 +167,10 @@
                     <!-- CPU -->
                     <Grid x:Name="FullCpu" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="34" />
-                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="Auto" MinWidth="34" SharedSizeGroup="Tag" />
+                            <ColumnDefinition Width="Auto" MinWidth="44" SharedSizeGroup="Temp" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="Auto" MinWidth="40" SharedSizeGroup="Load" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -175,10 +190,10 @@
                     <!-- RAM -->
                     <Grid x:Name="FullRam" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="34" />
-                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="Auto" MinWidth="34" SharedSizeGroup="Tag" />
+                            <ColumnDefinition Width="Auto" MinWidth="44" SharedSizeGroup="Temp" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="Auto" MinWidth="40" SharedSizeGroup="Load" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -200,36 +215,36 @@
                 <!-- each group but the first opens with its own divider; code hides the one that ends up leading -->
                 <StackPanel x:Name="CompactPanel" Orientation="Horizontal" Visibility="Collapsed">
                     <StackPanel x:Name="CompactFps" Orientation="Horizontal">
-                        <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}" Style="{StaticResource Figure}" FontSize="18" />
-                        <TextBlock Text="fps" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
+                        <TextBlock Text="{Binding FpsText}" Foreground="{Binding FpsBrush}" Style="{StaticResource Figure}" FontSize="{DynamicResource NumCompactHero}" />
+                        <TextBlock Text="fps" FontSize="{DynamicResource LblNote}" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="4,0,0,3" />
                         <TextBlock Text="{Binding BottleneckText}" Foreground="{Binding BottleneckBrush}" Visibility="{Binding BottleneckVisibility}"
-                                   FontSize="10" FontWeight="SemiBold" VerticalAlignment="Bottom" Margin="7,0,0,3" />
+                                   FontSize="{DynamicResource LblNote}" FontWeight="SemiBold" VerticalAlignment="Bottom" Margin="7,0,0,3" />
                     </StackPanel>
 
                     <StackPanel x:Name="CompactGpu" Orientation="Horizontal">
-                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <Border Width="1" Height="{DynamicResource Divider}" Background="{StaticResource RuleBrush}" Margin="12,0" />
                         <TextBlock Text="GPU" Style="{StaticResource Device}" Foreground="{DynamicResource GpuHue}" Margin="0,0,7,0" />
                         <TextBlock Text="{Binding GpuTempText}" Foreground="{Binding GpuTempBrush}" Style="{StaticResource Figure}" />
                         <StackPanel Orientation="Horizontal" Visibility="{Binding GpuHotspotVisibility}">
-                            <TextBlock Text="/" Style="{StaticResource Figure}" FontSize="12" Foreground="{StaticResource Faint}" Margin="2,0" />
-                            <TextBlock Text="{Binding GpuHotspotText}" Foreground="{Binding GpuHotspotBrush}" Style="{StaticResource Figure}" FontSize="13" />
+                            <TextBlock Text="/" Style="{StaticResource Figure}" FontSize="{DynamicResource NumSmall}" Foreground="{StaticResource Faint}" Margin="2,0" />
+                            <TextBlock Text="{Binding GpuHotspotText}" Foreground="{Binding GpuHotspotBrush}" Style="{StaticResource Figure}" FontSize="{DynamicResource NumHotspot}" />
                         </StackPanel>
                         <TextBlock Text="{Binding GpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
                         <StackPanel Orientation="Horizontal" Visibility="{Binding CompactVramVisibility}" Margin="7,0,0,0">
                             <TextBlock Text="{Binding GpuVramShortText}" Style="{StaticResource FigureRight}" />
-                            <TextBlock Text="vram" FontSize="10" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="3,0,0,3" />
+                            <TextBlock Text="vram" FontSize="{DynamicResource LblNote}" Foreground="{StaticResource Soft}" VerticalAlignment="Bottom" Margin="3,0,0,3" />
                         </StackPanel>
                     </StackPanel>
 
                     <StackPanel x:Name="CompactCpu" Orientation="Horizontal">
-                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <Border Width="1" Height="{DynamicResource Divider}" Background="{StaticResource RuleBrush}" Margin="12,0" />
                         <TextBlock Text="CPU" Style="{StaticResource Device}" Foreground="{DynamicResource CpuHue}" Margin="0,0,7,0" />
                         <TextBlock Text="{Binding CpuTempText}" Foreground="{Binding CpuTempBrush}" Style="{StaticResource Figure}" />
                         <TextBlock Text="{Binding CpuLoadText}" Style="{StaticResource FigureRight}" Margin="7,0,0,0" />
                     </StackPanel>
 
                     <StackPanel x:Name="CompactRam" Orientation="Horizontal">
-                        <Border Width="1" Height="14" Background="{StaticResource RuleBrush}" Margin="12,0" />
+                        <Border Width="1" Height="{DynamicResource Divider}" Background="{StaticResource RuleBrush}" Margin="12,0" />
                         <TextBlock Text="RAM" Style="{StaticResource Device}" Foreground="{DynamicResource RamHue}" Margin="0,0,7,0" />
                         <TextBlock Text="{Binding RamLoadText}" Style="{StaticResource FigureRight}" />
                     </StackPanel>

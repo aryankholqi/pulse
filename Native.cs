@@ -206,6 +206,22 @@ internal static class Native
     [StructLayout(LayoutKind.Sequential)]
     struct RECT { public int L, T, R, B; }
 
+    /// <summary>Full path of a process's .exe. Limited query rights: works without admin for most processes.</summary>
+    public static string? ExePathOf(int pid)
+    {
+        IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (handle == IntPtr.Zero) return null;
+        try
+        {
+            var path = new System.Text.StringBuilder(1024);
+            int size = path.Capacity;
+            return QueryFullProcessImageName(handle, 0, path, ref size) ? path.ToString(0, size) : null;
+        }
+        finally { CloseHandle(handle); }
+    }
+
+    const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
     // ── P/Invoke ──
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
@@ -229,5 +245,8 @@ internal static class Native
     [DllImport("kernel32.dll")] static extern bool SetInformationJobObject(IntPtr job, int infoClass, IntPtr info, uint length);
     [DllImport("kernel32.dll")] public static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
     [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "QueryFullProcessImageNameW")]
+    static extern bool QueryFullProcessImageName(IntPtr process, int flags, System.Text.StringBuilder path, ref int size);
     [DllImport("kernel32.dll")] static extern bool K32EnumProcesses([Out] uint[] processIds, uint size, out uint bytesReturned);
 }

@@ -9,6 +9,9 @@ public sealed record GameSession
 {
     public string Game { get; init; } = "";
     public string Process { get; init; } = "";
+
+    /// <summary>Where the game's .exe is: its icon on the game profiles page. Null in sessions recorded before 2.7.</summary>
+    public string? ExePath { get; init; }
     public DateTime Started { get; init; }
     public DateTime Ended { get; init; }
 
@@ -152,7 +155,12 @@ public sealed class SessionTracker
         }
 
         // The window title is the name players know ("Red Dead Redemption 2", not "RDR2").
-        var rec = new SessionRecorder(name, TitleOf(window) ?? name) { Window = window, Fullscreen = Native.CoversMonitor(window) };
+        var rec = new SessionRecorder(name, TitleOf(window) ?? name)
+        {
+            Window = window,
+            Fullscreen = Native.CoversMonitor(window),
+            ExePath = Native.ExePathOf(target),
+        };
 
         lock (_gate)
         {
@@ -313,6 +321,8 @@ internal sealed class SessionRecorder
     public volatile string Game;
     /// <summary>The window <see cref="Game"/> was read from. UI thread only.</summary>
     public IntPtr Window;
+    /// <summary>The game's .exe, read once when the session starts.</summary>
+    public string? ExePath;
     /// <summary>The game filled its monitor at some point (fullscreen or borderless). Set on the UI thread.</summary>
     public volatile bool Fullscreen;
 
@@ -418,6 +428,7 @@ internal sealed class SessionRecorder
         {
             Game = Game,
             Process = _process,
+            ExePath = ExePath,
             Started = _started,
             Ended = DateTime.Now,
             PlaySeconds = _playMs / 1000,

@@ -94,7 +94,7 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
     public Brush BottleneckBrush { get => _bottleneckBrush; private set => Set(ref _bottleneckBrush, value); }
     public Visibility BottleneckVisibility { get => _bottleneckVisibility; private set => Set(ref _bottleneckVisibility, value); }
 
-    public void ApplyStyle(AppSettings settings)
+    public void ApplyStyle(OverlayStyle settings)
     {
         _fpsSmooth = ColorUtil.Solid(ColorUtil.Parse(settings.FpsColor, AppSettings.DefaultFpsColor));
         _fpsWarnings = settings.FpsWarnings;
@@ -107,6 +107,23 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
         RefreshHotspotVisibility();
         _showCompactVram = settings.ShowCompactVram;
         RefreshCompactVramVisibility();
+        _heatColors = settings.HeatColors;
+        _plainTemp = ColorUtil.Solid(ColorUtil.Parse(settings.NumberColor, OverlayStyle.DefaultNumberColor));
+        RefreshTempBrushes();
+    }
+
+    // temperatures: thermal colours, or (heat colours off) the numbers' own colour
+    bool _heatColors = true;
+    Brush _plainTemp = ColorUtil.Solid(ColorUtil.Parse(OverlayStyle.DefaultNumberColor, OverlayStyle.DefaultNumberColor));
+    float? _gpuTemp, _cpuTemp;
+
+    Brush TempBrush(float? t, Func<float?, Brush> heat) => t is null ? Palette.Muted : _heatColors ? heat(t) : _plainTemp;
+
+    void RefreshTempBrushes()
+    {
+        GpuTempBrush = TempBrush(_gpuTemp, Palette.ForTemp);
+        GpuHotspotBrush = TempBrush(_gpuHotspot, Palette.ForHotspot);
+        CpuTempBrush = TempBrush(_cpuTemp, Palette.ForTemp);
     }
 
     // ── gpu ──
@@ -178,10 +195,11 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
 
         // gpu
         GpuTempText = Temp(hw.GpuTemp);
-        GpuTempBrush = Palette.ForTemp(hw.GpuTemp);
         GpuHotspotText = Temp(hw.GpuHotspot);
-        GpuHotspotBrush = Palette.ForHotspot(hw.GpuHotspot);
+        _gpuTemp = hw.GpuTemp;
         _gpuHotspot = hw.GpuHotspot;
+        _cpuTemp = hw.CpuTemp;
+        RefreshTempBrushes();
         RefreshHotspotVisibility();
         GpuLoad = hw.GpuLoad ?? 0;
         GpuLoadText = Pct(hw.GpuLoad);
@@ -194,7 +212,6 @@ public sealed class OverlayViewModel : INotifyPropertyChanged
 
         // cpu
         CpuTempText = Temp(hw.CpuTemp);
-        CpuTempBrush = Palette.ForTemp(hw.CpuTemp);
         CpuLoad = hw.CpuLoad ?? 0;
         CpuLoadText = Pct(hw.CpuLoad);
         CpuName = ShortCpu(hw.CpuName);
