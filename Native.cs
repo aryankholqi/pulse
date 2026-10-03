@@ -35,6 +35,67 @@ internal static class Native
         try { DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref on, sizeof(int)); } catch { }
     }
 
+    // ── liquid glass: Windows blurs whatever is behind the overlay ──
+    [StructLayout(LayoutKind.Sequential)]
+    struct ACCENT_POLICY
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public uint GradientColor;
+        public int AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct WINDOWCOMPOSITIONATTRIBDATA
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    const int WCA_ACCENT_POLICY = 19;
+    const int ACCENT_DISABLED = 0, ACCENT_ENABLE_BLURBEHIND = 3;
+
+    /// <summary>
+    /// Blur what's behind the window wherever it isn't opaque (Windows 10 / 11; ignored elsewhere). The tint is the
+    /// window's own: the blur itself is left clear.
+    /// </summary>
+    public static void SetBlurBehind(IntPtr hwnd, bool on)
+    {
+        var accent = new ACCENT_POLICY { AccentState = on ? ACCENT_ENABLE_BLURBEHIND : ACCENT_DISABLED };
+        int size = Marshal.SizeOf<ACCENT_POLICY>();
+        IntPtr ptr = Marshal.AllocHGlobal(size);
+        try
+        {
+            Marshal.StructureToPtr(accent, ptr, false);
+            var data = new WINDOWCOMPOSITIONATTRIBDATA { Attribute = WCA_ACCENT_POLICY, Data = ptr, SizeOfData = size };
+            SetWindowCompositionAttribute(hwnd, ref data);
+        }
+        catch { }
+        finally { Marshal.FreeHGlobal(ptr); }
+    }
+
+    const int DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWA_BORDER_COLOR = 34;
+    const int DWMWCP_DONOTROUND = 1, DWMWCP_ROUND = 2;
+    const uint DWMWA_COLOR_NONE = 0xFFFFFFFE, DWMWA_COLOR_DEFAULT = 0xFFFFFFFF;
+
+    /// <summary>
+    /// Round the window's corners, blur included, with no border (Windows 11; ignored elsewhere). The accent blur
+    /// fills the whole window rectangle and neither a window region nor a blur-behind region cuts it: only DWM's own
+    /// corner rounding does. Its radius is fixed (8 DIPs), so the card matches it, not the other way round.
+    /// </summary>
+    public static void SetRoundCorners(IntPtr hwnd, bool on)
+    {
+        int corner = on ? DWMWCP_ROUND : DWMWCP_DONOTROUND;
+        int border = unchecked((int)(on ? DWMWA_COLOR_NONE : DWMWA_COLOR_DEFAULT));
+        try
+        {
+            DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
+            DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
+        }
+        catch { }
+    }
+
     // ── low-impact process mode ──
     [StructLayout(LayoutKind.Sequential)]
     struct PROCESS_POWER_THROTTLING_STATE
@@ -236,6 +297,8 @@ internal static class Native
     [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll")] static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WINDOWCOMPOSITIONATTRIBDATA data);
 
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 

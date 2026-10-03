@@ -39,6 +39,8 @@ public partial class App : Application
     UpdateWindow? _updateWindow;
     IReadOnlyList<WhatsNew.Release>? _whatsNew;   // just updated: shown once the user opens the window
     GameSession? _pendingSummary;                  // a game ended while another one was in front
+    int _pendingGamePid;                           // the game it waits on: it opens by itself only once that game closes
+    bool _pendingNoted;                            // the "click to open" tray note for it has been shown
     SessionSummaryWindow? _summaryWindow;
     SavedSummariesWindow? _savedWindow;
     GameSession? _benchDone;                       // a run that just ended: its result stays on the overlay a moment
@@ -182,17 +184,50 @@ public partial class App : Application
                      ?? (_settings.ShowSessionSummary && ended.Count > 0 ? ended[^1] : null);
         if (latest is null)
         {
-            if (_pendingSummary is { } pending && !InGameFor(pending)) ShowSummary(pending);
+            if (_pendingSummary is { } pending) ReleasePending(pending);
             return;
         }
 
         if (InGameFor(latest))
         {
             // Already in another game: never pop a window over it. A tray note it is, until that game is over.
-            _pendingSummary = latest;
+            HoldSummary(latest, noted: true);
             _tray?.ShowBalloonTip(6000, "Pulse", string.Format(Loc.T("TraySummaryReady"), latest.Game), Forms.ToolTipIcon.Info);
         }
         else ShowSummary(latest);
+    }
+
+    /// <summary>Keep a summary back until the game in front has closed.</summary>
+    void HoldSummary(GameSession session, bool noted)
+    {
+        _pendingSummary = session;
+        _pendingGamePid = _fps?.Sessions.GameInFrontPid ?? 0;
+        _pendingNoted = noted;
+    }
+
+    /// <summary>
+    /// A held summary opens by itself only once its game has closed. Alt-tabbing out of a game that still runs
+    /// isn't leaving it: a window grabbing the foreground mid-switch crashes some games (The Last of Us Part II).
+    /// Out of it, a tray note offers the summary instead; a click on it is the player's own.
+    /// </summary>
+    void ReleasePending(GameSession pending)
+    {
+        if (_fps is null) return;
+        if (InGameFor(pending))
+        {
+            // its game closed but the player is in another one now: wait on that one
+            if (!_fps.Sessions.IsLive(_pendingGamePid)) _pendingGamePid = _fps.Sessions.GameInFrontPid;
+            return;
+        }
+        if (!_fps.Sessions.IsLive(_pendingGamePid)) { ShowSummary(pending); return; }
+        if (_pendingNoted) return;
+
+        _pendingNoted = true;
+        string text = pending.Benchmark
+            ? string.Format(Loc.T("BenchDone"), Math.Round(pending.AvgFps).ToString("0"),
+                  pending.Low1 is double low ? Math.Round(low).ToString("0") : "–") + " " + Loc.T("BenchDoneClick")
+            : string.Format(Loc.T("TraySummaryReady"), pending.Game);
+        _tray?.ShowBalloonTip(6000, "Pulse", text, Forms.ToolTipIcon.Info);
     }
 
     void ShowSummary(GameSession session)
@@ -267,9 +302,11 @@ public partial class App : Application
             run.Low1 is double low ? Math.Round(low).ToString("0") : "–");
         if (InGameFor(run))
         {
-            // still in the game: never pop a window over it. The full result opens once the player leaves it.
-            _pendingSummary = run;
-            if (_window?.IsVisible != true)
+            // still in the game: never pop a window over it. The full result opens once the game is closed,
+            // or from a tray note (shown now with the overlay hidden, else once the player alt-tabs out)
+            bool note = _window?.IsVisible != true;
+            HoldSummary(run, noted: note);
+            if (note)
                 _tray?.ShowBalloonTip(6000, "Pulse", result + " " + Loc.T("BenchDoneClick"), Forms.ToolTipIcon.Info);
         }
         else ShowSummary(run);

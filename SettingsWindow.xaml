@@ -484,7 +484,7 @@
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
                                             <!-- a brush, not an Image: the scene fills the stage without setting its height -->
-                                            <Rectangle Grid.RowSpan="2">
+                                            <Rectangle x:Name="TextStageBack" Grid.RowSpan="2">
                                                 <Rectangle.Fill>
                                                     <ImageBrush x:Name="TextStageScene" Stretch="UniformToFill" />
                                                 </Rectangle.Fill>
@@ -563,6 +563,12 @@
                                             <Slider x:Name="OpacitySlider" Style="{StaticResource Slim}" Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
                                                     IsSnapToTickEnabled="True" TickFrequency="0.05" />
                                         </DockPanel>
+                                        <CheckBox x:Name="LiquidGlass" Style="{StaticResource Switch}" Margin="0,14,0,0" ToolTipService.ShowOnDisabled="True">
+                                            <StackPanel>
+                                                <TextBlock Text="{local:T LiquidGlass}" />
+                                                <TextBlock x:Name="LiquidGlassHint" Text="{local:T LiquidGlassHint}" Style="{StaticResource Hint}" />
+                                            </StackPanel>
+                                        </CheckBox>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

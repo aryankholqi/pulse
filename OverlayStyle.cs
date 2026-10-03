@@ -31,6 +31,9 @@ public class OverlayStyle
     public double Scale { get; set; } = 1.0;
     public double BackgroundOpacity { get; set; } = 0.92;
 
+    /// <summary>Liquid glass: the background blurs the game behind it, with a clear tint and a bright rim. Opt-in.</summary>
+    public bool LiquidGlass { get; set; }
+
     // ── what the overlay shows (at least MinMetrics stay on) ──
     public const int MinMetrics = 2;
     public bool ShowFps { get; set; } = true;
@@ -79,6 +82,7 @@ public class OverlayStyle
         Compact = other.Compact;
         Scale = other.Scale;
         BackgroundOpacity = other.BackgroundOpacity;
+        LiquidGlass = other.LiquidGlass;
         ShowFps = other.ShowFps;
         ShowGpu = other.ShowGpu;
         ShowCpu = other.ShowCpu;

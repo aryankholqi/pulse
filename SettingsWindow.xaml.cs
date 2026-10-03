@@ -77,6 +77,8 @@ public partial class SettingsWindow : Window
         InitializeComponent();
 
         PreviewCard.DataContext = _preview;
+        PreviewCard.BackdropSource = SceneImage; // liquid glass blurs the scene behind the card
+        TextSample.BackdropSource = TextStageBack;
         TextSample.DataContext = _preview; // same sample numbers, at full size, beside the text controls
         TextStage.SizeChanged += (_, _) =>
         {
@@ -324,6 +326,7 @@ public partial class SettingsWindow : Window
 
         ScaleSlider.Value = Math.Clamp(_style.Scale, ScaleSlider.Minimum, ScaleSlider.Maximum);
         OpacitySlider.Value = Math.Clamp(_style.BackgroundOpacity, OpacitySlider.Minimum, OpacitySlider.Maximum);
+        LiquidGlass.IsChecked = _style.LiquidGlass;
         RefreshSliderLabels();
     }
 
@@ -390,6 +393,7 @@ public partial class SettingsWindow : Window
 
         ScaleSlider.ValueChanged += (_, e) => { _style.Scale = Math.Round(e.NewValue, 2); RefreshSliderLabels(); Commit(); };
         OpacitySlider.ValueChanged += (_, e) => { _style.BackgroundOpacity = Math.Round(e.NewValue, 2); RefreshSliderLabels(); Commit(); };
+        OnSwitch(LiquidGlass, on => { _style.LiquidGlass = on; Commit(); });
 
         OnSwitch(ShowOnLaunch, on => { _settings.ShowSettingsOnLaunch = on; Save(); });
         OnSwitch(ShowSummary, on => { _settings.ShowSessionSummary = on; Save(); });
@@ -1053,6 +1057,11 @@ public partial class SettingsWindow : Window
         OpacityValue.Text = _style.BackgroundOpacity < 0.01
             ? Loc.T("GlassNone")
             : (_style.BackgroundOpacity * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
+
+        // liquid glass needs a background to show on: kept as chosen, just greyed out while there's none
+        bool glass = _style.BackgroundOpacity >= 0.01;
+        LiquidGlass.IsEnabled = glass;
+        LiquidGlass.ToolTip = glass ? null : Loc.T("LiquidGlassNeedsGlass");
     }
 
     protected override void OnClosed(EventArgs e)

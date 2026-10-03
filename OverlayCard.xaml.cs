@@ -29,9 +29,68 @@ public partial class OverlayCard : UserControl
         return e;
     }
 
+    /// <summary>
+    /// Liquid glass: a clear, cool tint over the blurred game, dark enough to keep ivory text readable on a
+    /// bright scene. The smoked glass (from the XAML) is kept for when it's off.
+    /// </summary>
+    readonly Brush _smoked;
+    readonly LinearGradientBrush _liquid = new(new GradientStopCollection
+    {
+        new GradientStop(Color.FromArgb(0x70, 0x22, 0x28, 0x3E), 0),
+        new GradientStop(Color.FromArgb(0x80, 0x12, 0x16, 0x24), 1),
+    }, new Point(0, 0), new Point(0.35, 1));
+
     public OverlayCard()
     {
         InitializeComponent();
+        _smoked = Card.Background;
+        LayoutUpdated += (_, _) => FitBackdrop();
+    }
+
+    /// <summary>The look asks for liquid glass and has a background to show it on.</summary>
+    public bool LiquidGlass { get; private set; }
+
+    /// <summary>
+    /// For a card that isn't its own window (the settings preview): what lies behind it, blurred under liquid glass.
+    /// Must not be an ancestor of the card.
+    /// </summary>
+    public Visual? BackdropSource
+    {
+        get => _backdropSource;
+        set
+        {
+            _backdropSource = value;
+            BackdropFill.Fill = value is null ? null : new VisualBrush(value) { ViewboxUnits = BrushMappingMode.Absolute, Stretch = Stretch.Fill };
+            _backdropView = Rect.Empty;
+            ShowBackdrop();
+        }
+    }
+
+    Visual? _backdropSource;
+    Rect _backdropView = Rect.Empty;
+    const double LiquidCorner = 8; // DWM's round window corner, in DIPs (Native.SetRoundCorners)
+    const double BackdropBleed = 24; // past the card on every side: the blur's soft edge falls outside the clip
+
+    void ShowBackdrop() =>
+        Backdrop.Visibility = LiquidGlass && _backdropSource is not null ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Line the blurred copy up with what's really behind the card. Cheap when nothing moved.</summary>
+    void FitBackdrop()
+    {
+        if (Backdrop.Visibility != Visibility.Visible || _backdropSource is null || BackdropFill.Fill is not VisualBrush brush) return;
+        double w = Backdrop.ActualWidth, h = Backdrop.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        try
+        {
+            var area = new Rect(-BackdropBleed, -BackdropBleed, w + 2 * BackdropBleed, h + 2 * BackdropBleed);
+            var view = Backdrop.TransformToVisual(_backdropSource).TransformBounds(area);
+            if (view == _backdropView) return;
+            _backdropView = view;
+            brush.Viewbox = view;
+            BackdropFill.Margin = new Thickness(-BackdropBleed);
+            Backdrop.Clip = new RectangleGeometry(new Rect(0, 0, w, h), Card.CornerRadius.TopLeft, Card.CornerRadius.TopLeft);
+        }
+        catch (InvalidOperationException) { } // not in the same tree (yet)
     }
 
     /// <summary>Layout, size, glass opacity and colours from settings.</summary>
@@ -45,7 +104,6 @@ public partial class OverlayCard : UserControl
         FullPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         CompactPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
         Card.Padding = compact ? new Thickness(14, 8, 14, 8) : new Thickness(16, 14, 16, 14);
-        Card.CornerRadius = new CornerRadius(compact ? 12 : 16);
 
         ApplyMetrics(settings);
 
@@ -53,11 +111,25 @@ public partial class OverlayCard : UserControl
         // and a soft shadow under the figures keeps them readable on a bright scene.
         double opacity = Math.Clamp(settings.BackgroundOpacity, 0, 1.0);
         bool bare = opacity < 0.01;
+        bool liquid = settings.LiquidGlass && !bare;
+        LiquidGlass = liquid;
+
+        // Windows rounds the live overlay's blur at a fixed 8 DIPs, whatever the size: liquid glass's card follows it.
+        Card.CornerRadius = new CornerRadius(liquid ? LiquidCorner / scale : compact ? 12 : 16);
+
+        Card.Background = liquid ? _liquid : _smoked;
         if (Card.Background is { IsFrozen: false } glass) glass.Opacity = opacity;
-        Card.BorderThickness = new Thickness(bare ? 0 : 1);
+        Card.BorderThickness = new Thickness(bare || liquid ? 0 : 1); // liquid glass wears the sheen's rim instead
+        Sheen.Visibility = liquid ? Visibility.Visible : Visibility.Collapsed;
+        CatchLight.Visibility = liquid ? Visibility.Collapsed : Visibility.Visible; // liquid glass lights only its corners
+        SheenTopLeft.CornerRadius = SheenBottomRight.CornerRadius = Card.CornerRadius;
+        Sheen.Opacity = 0.55 + 0.45 * opacity; // the rim fades with the glass, but never away
+        _backdropView = Rect.Empty; // the corners may have changed
+        ShowBackdrop();
+
         Figures.Effect = bare ? Legible : null;
         Card.Effect = bare ? Legible : null; // a second pass: one soft halo is too faint around thin text
-        ApplyText(settings, bare);
+        ApplyText(settings, bare || liquid); // the game shows through liquid glass: the quiet shades lighten as with none
 
         ApplyTheme(settings);
     }
@@ -100,10 +172,10 @@ public partial class OverlayCard : UserControl
 
     /// <summary>
     /// Sizes and colours of the numbers and the labels. The quiet shades (secondary numbers, notes,
-    /// meter tracks, rules) are tuned for the dark glass; with no glass they'd vanish into a bright scene, so
-    /// they lighten. The brushes are shared by the card's styles: recolouring them is enough.
+    /// meter tracks, rules) are tuned for the dark glass; with no glass, or liquid glass the game shows through,
+    /// they'd vanish into a bright scene, so they lighten. The brushes are shared by the card's styles: recolouring them is enough.
     /// </summary>
-    void ApplyText(OverlayStyle s, bool bare)
+    void ApplyText(OverlayStyle s, bool seeThrough)
     {
         double num = Math.Clamp(s.NumberSize, OverlayStyle.MinTextSize, OverlayStyle.MaxTextSize);
         double lbl = Math.Clamp(s.LabelSize, OverlayStyle.MinTextSize, OverlayStyle.MaxTextSize);
@@ -116,17 +188,17 @@ public partial class OverlayCard : UserControl
         var ink = ColorUtil.Parse(s.NumberColor, OverlayStyle.DefaultNumberColor);
         bool stockInk = ink == ColorUtil.Parse(OverlayStyle.DefaultNumberColor, OverlayStyle.DefaultNumberColor);
         Tint("Ink", ink);
-        Tint("NumSoft", stockInk ? Stock(bare ? 0xE6E9F2 : 0xA3AAC2) : bare ? ink : ColorUtil.Mix(ink, Glass, 0.3));
+        Tint("NumSoft", stockInk ? Stock(seeThrough ? 0xE6E9F2 : 0xA3AAC2) : seeThrough ? ink : ColorUtil.Mix(ink, Glass, 0.3));
 
         // Labels: names and units in the colour, the smallest notes a step quieter.
         var label = ColorUtil.Parse(s.LabelColor, OverlayStyle.DefaultLabelColor);
         bool stockLabel = label == ColorUtil.Parse(OverlayStyle.DefaultLabelColor, OverlayStyle.DefaultLabelColor);
-        Tint("Soft", stockLabel ? Stock(bare ? 0xE6E9F2 : 0xA3AAC2) : label);
-        Tint("Faint", stockLabel ? Stock(bare ? 0xB9BFD1 : 0x5E6680)
-                                 : ColorUtil.Mix(label, bare ? Colors.Gray : Glass, bare ? 0.2 : 0.4));
+        Tint("Soft", stockLabel ? Stock(seeThrough ? 0xE6E9F2 : 0xA3AAC2) : label);
+        Tint("Faint", stockLabel ? Stock(seeThrough ? 0xB9BFD1 : 0x5E6680)
+                                 : ColorUtil.Mix(label, seeThrough ? Colors.Gray : Glass, seeThrough ? 0.2 : 0.4));
 
-        Tint("TrackBrush", Color.FromArgb((byte)(bare ? 0x40 : 0x1C), 0xFF, 0xFF, 0xFF));
-        Tint("RuleBrush", Color.FromArgb((byte)(bare ? 0x30 : 0x14), 0xFF, 0xFF, 0xFF));
+        Tint("TrackBrush", Color.FromArgb((byte)(seeThrough ? 0x40 : 0x1C), 0xFF, 0xFF, 0xFF));
+        Tint("RuleBrush", Color.FromArgb((byte)(seeThrough ? 0x30 : 0x14), 0xFF, 0xFF, 0xFF));
     }
 
     static Color Stock(int rgb) => Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);

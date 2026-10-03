@@ -68,6 +68,16 @@
             <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1" />
         </Grid.LayoutTransform>
 
+        <!-- liquid glass in the preview: the scene behind the card, blurred (the live overlay asks Windows to blur
+             the game instead). Inflated past the card so the blur has no soft rim; the clip, set in code, cuts it to the card. -->
+        <Border x:Name="Backdrop" Visibility="Collapsed" IsHitTestVisible="False">
+            <Rectangle x:Name="BackdropFill">
+                <Rectangle.Effect>
+                    <BlurEffect Radius="22" KernelType="Gaussian" RenderingBias="Performance" />
+                </Rectangle.Effect>
+            </Rectangle>
+        </Border>
+
         <Border x:Name="Card" CornerRadius="16" BorderThickness="1" Padding="16,14">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0.35,1">
@@ -263,8 +273,38 @@
             </Grid>
         </Border>
 
+        <!-- liquid glass: a soft sheen from the top-left, and a specular rim only where light catches the glass: at the
+             top-left and bottom-right corners, fading linearly along both edges from each. The rest of the edge is bare.
+             Each rim is a radial fade from its corner in the card's own proportions, so a wide, short compact card
+             fades along its long edge as well as its short one. -->
+        <Grid x:Name="Sheen" Visibility="Collapsed" IsHitTestVisible="False">
+            <Border x:Name="SheenTopLeft" CornerRadius="16" BorderThickness="1">
+                <Border.Background>
+                    <RadialGradientBrush Center="0.2,0" GradientOrigin="0.2,0" RadiusX="0.9" RadiusY="1.1">
+                        <GradientStop Color="#2EFFFFFF" Offset="0" />
+                        <GradientStop Color="#0AFFFFFF" Offset="0.55" />
+                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                    </RadialGradientBrush>
+                </Border.Background>
+                <Border.BorderBrush>
+                    <RadialGradientBrush Center="0,0" GradientOrigin="0,0" RadiusX="0.42" RadiusY="0.5">
+                        <GradientStop Color="#E6FFFFFF" Offset="0" />
+                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                    </RadialGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+            <Border x:Name="SheenBottomRight" CornerRadius="16" BorderThickness="1">
+                <Border.BorderBrush>
+                    <RadialGradientBrush Center="1,1" GradientOrigin="1,1" RadiusX="0.42" RadiusY="0.5">
+                        <GradientStop Color="#E6FFFFFF" Offset="0" />
+                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                    </RadialGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+        </Grid>
+
         <!-- a single catch-light along the top edge -->
-        <Border Height="1" VerticalAlignment="Top" Margin="30,0" IsHitTestVisible="False">
+        <Border x:Name="CatchLight" Height="1" VerticalAlignment="Top" Margin="30,0" IsHitTestVisible="False">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                     <GradientStop Color="#00FFFFFF" Offset="0" />

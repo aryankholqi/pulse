@@ -76,6 +76,9 @@ public sealed class SessionTracker
     public const double MinBenchmarkSeconds = 5;
     const int MaxLive = 8;
     const double PlayingSeconds = 2;   // "is it drawing right now?" look-back
+    // "is the player still in it?" look-back: a loading screen or a hitch can stop a game drawing for seconds,
+    // and a window popped over it then takes its focus, which some games (The Last of Us Part II) don't survive
+    const double InGameSeconds = 30;
 
     // Apps that draw frames in front of the player but aren't games.
     static readonly HashSet<string> NotGames = new(StringComparer.OrdinalIgnoreCase)
@@ -263,7 +266,7 @@ public sealed class SessionTracker
         {
             lock (_gate)
             {
-                if (!_live.TryGetValue(_foreground, out var rec) || !rec.IsPlaying(PlayingSeconds)) return false;
+                if (!_live.TryGetValue(_foreground, out var rec) || !rec.IsPlaying(InGameSeconds)) return false;
             }
             return Native.CoversMonitor(_foregroundWindow);
         }
@@ -277,8 +280,20 @@ public sealed class SessionTracker
     {
         get
         {
-            lock (_gate) return _live.TryGetValue(_foreground, out var rec) && rec.IsPlaying(PlayingSeconds);
+            lock (_gate) return _live.TryGetValue(_foreground, out var rec) && rec.IsPlaying(InGameSeconds);
         }
+    }
+
+    /// <summary>UI thread: the pid of the game in front (0 = none), drawing or not.</summary>
+    public int GameInFrontPid
+    {
+        get { lock (_gate) return _live.ContainsKey(_foreground) ? _foreground : 0; }
+    }
+
+    /// <summary>Is this game still running? Alt-tabbed out of counts: its session isn't over.</summary>
+    public bool IsLive(int pid)
+    {
+        lock (_gate) return pid != 0 && _live.ContainsKey(pid);
     }
 
     /// <summary>Sessions whose game has exited, long enough to be worth a summary. Oldest first.</summary>

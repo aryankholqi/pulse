@@ -14,7 +14,7 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
-        new(new Version(2, 8, 5), new[]
+        new(new Version(2, 8, 0), new[]
         {
             ("New: benchmark mode. Press Ctrl+Shift+B in a game to record a timed run (30 s, 60 s, 2 min, or until you stop it). " +
              "The overlay counts down, then shows the result, and the full summary opens once you leave the game.",
@@ -24,6 +24,8 @@ internal static class WhatsNew
              "Runs are kept under Summaries until you delete them.",
              "برای هر اجرا اسم بگذار (مثلاً DLSS Quality) و آن را با هر اجرای دیگرِ همان بازی مقایسه کن تا ببینی کدام تنظیم واقعاً FPS بیشتری می‌دهد. " +
              "اجراها در «خلاصه‌ها» می‌مانند تا خودت پاکشان کنی."),
+            ("New: liquid glass. Turn it on under Appearance and the overlay's background becomes a clear glass that blurs the game behind it.",
+             "جدید: لیکوئید گلس. از بخش «ظاهر» روشنش کن تا پس‌زمینه‌ی اورلی شیشه‌ای شفاف شود که بازیِ پشتش را مات می‌کند."),
         }),
         new(new Version(2, 7, 1), new[]
         {

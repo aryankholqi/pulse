@@ -29,6 +29,20 @@ public partial class OverlayWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         Native.MakeOverlayWindow(_hwnd); // click-through, no focus, no Alt+Tab
+        ApplyBackdrop();
+    }
+
+    bool _blurred;
+
+    /// <summary>Liquid glass: Windows blurs the game behind the card, inside its rounded corners.</summary>
+    void ApplyBackdrop()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        bool on = Card.LiquidGlass;
+        if (on == _blurred) return;
+        Native.SetBlurBehind(_hwnd, on);
+        Native.SetRoundCorners(_hwnd, on);
+        _blurred = on;
     }
 
     public void ApplySettings()
@@ -36,6 +50,7 @@ public partial class OverlayWindow : Window
         Card.ApplySettings(Look);
         ViewModel.ApplyStyle(Look);
         Reposition();
+        ApplyBackdrop();
     }
 
     /// <summary>Wear another look (a game with its own profile came to the front, or left).</summary>
