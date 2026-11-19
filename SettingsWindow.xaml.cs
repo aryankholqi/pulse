@@ -63,8 +63,8 @@ public partial class SettingsWindow : Window
     public event Action<GameSession>? SummaryRequested;
     public event Action? LastSummaryRequested;
 
-    public SettingsWindow(AppSettings settings, Func<HardwareSnapshot?> realHardware, Func<bool?> hotspotSupported, Func<bool> overlayRunning,
-        Func<IReadOnlyList<(string Process, string Name)>> knownGames)
+    internal SettingsWindow(AppSettings settings, Func<HardwareSnapshot?> realHardware, Func<bool?> hotspotSupported, Func<bool> overlayRunning,
+        Func<IReadOnlyList<(string Process, string Name)>> knownGames, GameBoost boost)
     {
         _settings = settings;
         _style = settings;
@@ -75,6 +75,7 @@ public partial class SettingsWindow : Window
         _scene = GameScenes.Find(settings.PreviewScene);
 
         InitializeComponent();
+        BoostPage.Attach(settings, boost, () => Changed?.Invoke());
 
         PreviewCard.DataContext = _preview;
         PreviewCard.BackdropSource = SceneImage; // liquid glass blurs the scene behind the card
@@ -948,7 +949,7 @@ public partial class SettingsWindow : Window
         BrandText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
 
         // icons only: each entry says what it is on hover
-        foreach (var nav in new[] { NavOverlay, NavProfiles, NavSummaries, NavSettings })
+        foreach (var nav in new[] { NavOverlay, NavProfiles, NavSummaries, NavBoost, NavSettings })
         {
             if (collapsed) nav.ToolTip = nav.Content;
             else nav.ClearValue(ToolTipProperty);
@@ -1077,6 +1078,7 @@ public partial class SettingsWindow : Window
         NavOverlay.Checked += (_, _) => ShowPage(OverlayPage);
         NavProfiles.Checked += (_, _) => { ShowProfileList(); ShowPage(ProfilesPage); };
         NavSummaries.Checked += (_, _) => ShowPage(SummariesPage);
+        NavBoost.Checked += (_, _) => ShowPage(BoostPage);
         NavSettings.Checked += (_, _) => ShowPage(SettingsPage);
 
         BrowseGame.Click += (_, _) => BrowseForGame();
@@ -1115,7 +1117,7 @@ public partial class SettingsWindow : Window
     /// <summary>One page at a time. The editor lives on the overlay page unless a game's profile is open.</summary>
     void ShowPage(FrameworkElement page)
     {
-        foreach (var p in new FrameworkElement[] { OverlayPage, ProfilesPage, SummariesPage, SettingsPage })
+        foreach (var p in new FrameworkElement[] { OverlayPage, ProfilesPage, SummariesPage, BoostPage, SettingsPage })
             p.Visibility = p == page ? Visibility.Visible : Visibility.Collapsed;
 
         if (page == OverlayPage)

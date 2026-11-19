@@ -25,6 +25,7 @@ public partial class App : Application
     RegisteredWaitHandle? _showWait;
     AppSettings? _settings;
     SensorService? _sensors;
+    GameBoost? _boost;
     FpsService? _fps;
     OverlayWindow? _window;
     SettingsWindow? _settingsWindow;
@@ -94,6 +95,8 @@ public partial class App : Application
 
         _sensors = new SensorService();
         _sensors.Start();
+        _boost = new GameBoost(_settings);
+        GameBoost.SelfCheck();
         MemoryModules.LoadInBackground(); // RAM type, speed and channels for the game summary
 
         _fps = new FpsService(AppSettings.Resolve(_settings.PresentMonPath), _settings.PresentMonArgs);
@@ -148,7 +151,11 @@ public partial class App : Application
         // The hot spot is a slow read on NVIDIA: only while the overlay's look shows it, or the preview may.
         _sensors.WantHotspot = _window.Look.ShowGpuHotspot || _settingsWindow?.IsVisible == true;
         if (!_sensors.Paused && _sensors.Latest is { } hw) _fps.Sessions.Sample(hw);
-        if (_tick % 4 == 0) CollectSessions();
+        if (_tick % 4 == 0)
+        {
+            CollectSessions();
+            _boost?.Tick(_fps.Sessions);
+        }
 
         // a timed benchmark stops by itself once it has recorded its length of play
         var sessions = _fps.Sessions;
@@ -403,7 +410,7 @@ public partial class App : Application
         {
             var sensors = _sensors;
             _settingsWindow = new SettingsWindow(_settings, () => sensors.Latest, () => sensors.HotspotSupported,
-                () => _window?.IsVisible == true, KnownGames);
+                () => _window?.IsVisible == true, KnownGames, _boost!);
             _settingsWindow.Changed += Commit;
             _settingsWindow.LanguageChanged += UpdateTrayLanguage;
             _settingsWindow.LaunchRequested += () =>
@@ -734,6 +741,7 @@ public partial class App : Application
         if (_fps != null)
             foreach (var session in _fps.Sessions.FinishAll()) SessionHistory.Add(session);
 
+        _boost?.Dispose(); // the game priority, plan and power limit go back before Pulse leaves
         _fps?.Dispose();
         _sensors?.Dispose();
         _settings?.Save();

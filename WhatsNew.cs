@@ -14,6 +14,28 @@ internal static class WhatsNew
 
     static readonly Release[] Releases =
     {
+        new(new Version(2, 9, 1), new[]
+        {
+            ("New: undervolt your NVIDIA GPU from the Boost page. Cap the clock where your card already runs in games and shift its voltage curve: " +
+             "the same FPS with less heat, noise and power.",
+             "جدید: آندرولت کارت NVIDIA از صفحه‌ی بوست. کلاک را همان‌جایی که کارتت در بازی کار می‌کند محدود کن و منحنی ولتاژ را جابه‌جا کن: " +
+             "همان FPS با گرما، صدا و مصرف کمتر."),
+            ("New settings stay on trial until you keep them. If the graphics driver crashes, Pulse goes back to stock by itself, " +
+             "and untested settings never come back after a restart.",
+             "تنظیمات جدید تا وقتی تأییدشان نکنی آزمایشی‌اند. اگر درایور گرافیک کرش کند، Pulse خودش به پیش‌فرض برمی‌گردد، " +
+             "و تنظیمات تست‌نشده بعد از ری‌استارت برنمی‌گردند."),
+            ("A step-by-step guide on the page walks you through it, even if you've never undervolted before.",
+             "یک راهنمای قدم‌به‌قدم در همان صفحه، حتی اگر تا حالا آندرولت نکرده باشی، همه‌چیز را توضیح می‌دهد."),
+        }),
+        new(new Version(2, 9, 0), new[]
+        {
+            ("New: the Boost page. While a game runs, Pulse can switch to a high performance power plan, give the game high priority, " +
+             "calm background apps and, on Ryzen X3D chips with two dies, keep the game on its V-cache cores. Everything goes back when the game closes.",
+             "جدید: صفحه‌ی بوست. موقع اجرای بازی، Pulse می‌تواند پلن انرژی را روی حداکثر کارایی ببرد، به بازی اولویت بالا بدهد، " +
+             "برنامه‌های پس‌زمینه را آرام کند و روی Ryzen X3D دو دای، بازی را روی هسته‌های V-cache نگه دارد. با بستن بازی همه‌چیز برمی‌گردد."),
+            ("New: set your NVIDIA GPU's power limit for less heat and noise, and see what is holding the GPU back: power, heat or hardware.",
+             "جدید: محدودیت توان کارت NVIDIA را برای گرما و صدای کمتر تنظیم کن، و ببین چه چیزی جلوی GPU را گرفته: توان، دما یا سخت‌افزار."),
+        }),
         new(new Version(2, 8, 0), new[]
         {
             ("New: benchmark mode. Press Ctrl+Shift+B in a game to record a timed run (30 s, 60 s, 2 min, or until you stop it). " +

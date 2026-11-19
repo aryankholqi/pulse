@@ -281,6 +281,7 @@
                     <RadioButton x:Name="NavOverlay" Style="{StaticResource NavItem}" Tag="&#xE7F4;" Content="{local:T NavOverlay}" />
                     <RadioButton x:Name="NavProfiles" Style="{StaticResource NavItem}" Tag="&#xE7FC;" Content="{local:T NavProfiles}" />
                     <RadioButton x:Name="NavSummaries" Style="{StaticResource NavItem}" Tag="&#xE9D2;" Content="{local:T NavSummaries}" />
+                    <RadioButton x:Name="NavBoost" Style="{StaticResource NavItem}" Tag="&#xE945;" Content="{local:T NavBoost}" />
                     <RadioButton x:Name="NavSettings" Style="{StaticResource NavItem}" Tag="&#xE713;" Content="{local:T NavSettings}" />
                 </StackPanel>
             </DockPanel>
@@ -730,6 +731,9 @@
                     </Grid>
                 </ScrollViewer>
             </Grid>
+
+            <!-- boost: while-you-play tweaks, GPU power limit, throttle check -->
+            <local:BoostPage x:Name="BoostPage" Visibility="Collapsed" />
 
             <!-- settings: language, general, hotkeys, thanks -->
             <Grid x:Name="SettingsPage" Visibility="Collapsed">

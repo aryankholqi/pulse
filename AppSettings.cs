@@ -36,6 +36,34 @@ public sealed class AppSettings : OverlayStyle
     /// <summary>How long a benchmark (Ctrl+Shift+B) records, in seconds of play. 0: until the hotkey is pressed again.</summary>
     public int BenchmarkSeconds { get; set; } = 60;
 
+    // ── boost: applied only while a game fills the screen, undone when it closes ──
+    public bool BoostPowerPlan { get; set; }
+    public bool BoostPriority { get; set; }
+    public bool BoostBackground { get; set; }
+    public bool BoostVCache { get; set; }
+
+    /// <summary>NVIDIA power limit in percent of stock, held while Pulse runs. Null: the card's own.</summary>
+    public int? GpuPowerLimit { get; set; }
+
+    /// <summary>The undervolt panel is unlocked (the user read the warning).</summary>
+    public bool GpuTuningUnlocked { get; set; }
+
+    /// <summary>MHz added to the whole voltage/frequency curve. 0: stock.</summary>
+    public int GpuClockOffset { get; set; }
+
+    /// <summary>Highest graphics clock allowed, in MHz. Null: no cap.</summary>
+    public int? GpuClockCap { get; set; }
+
+    /// <summary>
+    /// The player played on these clocks and pressed "Keep". Untested clocks are never applied again
+    /// after Pulse restarts: an offset that crashes Windows mustn't come back on every boot.
+    /// </summary>
+    public bool GpuTuningTested { get; set; }
+
+    /// <summary>The plan / power mode a boost replaced: written at once, so a crash mid-game still restores it next start.</summary>
+    public Guid? BoostRestorePlan { get; set; }
+    public Guid? BoostRestoreMode { get; set; }
+
     /// <summary>Open the customise window on launch (logon starts skip it: see <c>--tray</c>).</summary>
     public bool ShowSettingsOnLaunch { get; set; } = true;
 
@@ -89,6 +117,10 @@ public sealed class AppSettings : OverlayStyle
             {
                 s.FixMetrics();
                 s.BenchmarkSeconds = Math.Clamp(s.BenchmarkSeconds, 0, 3600);
+                if (s.GpuPowerLimit is < 30 or > 200) s.GpuPowerLimit = null;
+                if (s.GpuClockCap is < 300 or > 4000) s.GpuClockCap = null;
+                // an offset without a cap is an overclock, not an undervolt
+                s.GpuClockOffset = s.GpuClockCap == null ? 0 : Math.Clamp(s.GpuClockOffset, 0, Services.GameBoost.MaxOffset);
                 s.Profiles ??= new();
                 s.Profiles.RemoveAll(p => p is null || string.IsNullOrWhiteSpace(p.Process));
                 foreach (var p in s.Profiles) p.FixMetrics();
